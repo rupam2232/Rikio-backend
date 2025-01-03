@@ -88,7 +88,9 @@ const getVideoById = asyncHandler(async (req, res) => {
                             fullName: 1,
                             username: 1,
                             avatar: 1,
-                            verified: 1
+                            verified: 1,
+                            bio: 1,
+                            createdAt: 1
                         }
                     }
                 ]
@@ -257,6 +259,8 @@ const getAllVideos = asyncHandler(async (req, res) => {
                                 verified: 1,
                                 fullName: 1, 
                                 avatar: 1,
+                                bio: 1,
+                                createdAt: 1
                             }
                         }
                     ],
@@ -335,7 +339,10 @@ const getAllVideos = asyncHandler(async (req, res) => {
                     username: 1,
                     avatar: 1,
                     verified: 1,
-                    isSubscribed: 1
+                    isSubscribed: 1,
+                    bio: 1,
+                    createdAt: 1,
+                    subscribers: { $size: "$subscribers" }
                 }
             }
         ]);
@@ -370,22 +377,42 @@ const getAllVideos = asyncHandler(async (req, res) => {
             },
             {
                 $unwind: "$ownerDetails"
+            },{
+                $lookup: {
+                    from: "subscriptions",
+                    localField: "owner",
+                    foreignField: "channel",
+                    as: "subscribers"
+                }
+            },{
+                $addFields: {
+                    isSubscribed: {
+                        $cond: {
+                            if: { $in: [req.user?._id, "$subscribers.subscriber"] },
+                            then: true,
+                            else: false
+                        }
+                    }
+                }
             },
             {
                 $project: {
                     title: 1,
                     description: 1,
-                    tags: 1,
                     duration: 1,
                     uploadDate: 1,
                     views: 1,
-                    likes: 1,
+                    thumbnail: 1,
+                    isSubscribed: 1,
                     owner: {
                         _id: "$ownerDetails._id",
                         username: "$ownerDetails.username",
                         fullName: "$ownerDetails.fullName",
                         avatar: "$ownerDetails.avatar",
-                        verified: "$ownerDetails.verified"
+                        verified: "$ownerDetails.verified",
+                        bio: "$ownerDetails.bio",
+                        createdAt: "$ownerDetails.createdAt",
+                        subscribers: { $size: "$subscribers" }
                     }
                 }
             },
@@ -408,6 +435,23 @@ const getAllVideos = asyncHandler(async (req, res) => {
             },
             {
                 $unwind: "$ownerDetails" 
+            },{
+                $lookup: {
+                    from: "subscriptions",
+                    localField: "owner",
+                    foreignField: "channel",
+                    as: "subscribers"
+                }
+            },{
+                $addFields: {
+                    isSubscribed: {
+                        $cond: {
+                            if: { $in: [req.user?._id, "$subscribers.subscriber"] },
+                            then: true,
+                            else: false
+                        }
+                    }
+                }
             },
             {
                 $project: {
@@ -417,12 +461,16 @@ const getAllVideos = asyncHandler(async (req, res) => {
                     thumbnail: 1,
                     createdAt: 1,
                     views: 1,
+                    isSubscribed: 1,
                     owner: {
                         _id: "$ownerDetails._id",
                         username: "$ownerDetails.username",
                         fullName: "$ownerDetails.fullName",
                         avatar: "$ownerDetails.avatar",
-                        verified: "$ownerDetails.verified"
+                        verified: "$ownerDetails.verified",
+                        bio: "$ownerDetails.bio",
+                        subscribers: { $size: "$subscribers" },
+                        createdAt: "$ownerDetails.createdAt"
                     }
                 }
             }
@@ -448,6 +496,23 @@ const getAllVideos = asyncHandler(async (req, res) => {
             },
             {
                 $unwind: "$ownerDetails"
+            },,{
+                $lookup: {
+                    from: "subscriptions",
+                    localField: "owner",
+                    foreignField: "channel",
+                    as: "subscribers"
+                }
+            },{
+                $addFields: {
+                    isSubscribed: {
+                        $cond: {
+                            if: { $in: [req.user?._id, "$subscribers.subscriber"] },
+                            then: true,
+                            else: false
+                        }
+                    }
+                }
             },
             {
                 $project: {
@@ -457,13 +522,16 @@ const getAllVideos = asyncHandler(async (req, res) => {
                     thumbnail: 1,
                     createdAt: 1,
                     views: 1,
-                    likes: 1,
+                    isSubscribed: 1,
                     owner: {
                         __id: "$ownerDetails._id",
                         username: "$ownerDetails.username",
                         fullName: "$ownerDetails.fullName",
                         avatar: "$ownerDetails.avatar",
-                        verified: "$ownerDetails.verified"
+                        verified: "$ownerDetails.verified",
+                        bio: "$ownerDetails.bio",
+                        subscribers: { $size: "$subscribers" },
+                        createdAt: "$ownerDetails.createdAt"
                     }
                 }
             }
