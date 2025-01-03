@@ -5,12 +5,13 @@ import { ApiResponse } from "../utils/ApiResponse.js"
 import { asyncHandler } from "../utils/asyncHandler.js"
 import { Video } from "../models/video.model.js"
 import { Tweet } from "../models/tweet.model.js"
+import { isSubscribed } from "./subscription.controller.js"
 
 const getVideoComments = asyncHandler(async (req, res) => {
     const { videoId } = req.params
-    const { page = 1, limit = 10, sortBy = 'createdAt', sortType = 'desc'} = req.query
+    const { page = 1, limit = 10, sortBy = 'createdAt', sortType = 'desc' } = req.query
 
-    if(! isValidObjectId(videoId)) throw new ApiError(400, "video id is not valid")
+    if (!isValidObjectId(videoId)) throw new ApiError(400, "video id is not valid")
 
     const pageNumber = parseInt(page);
     const limitNumber = parseInt(limit);
@@ -23,22 +24,22 @@ const getVideoComments = asyncHandler(async (req, res) => {
 
     const skip = (pageNumber - 1) * limitNumber;
 
-    const isVideoAvl = await Video.findById( videoId)
+    const isVideoAvl = await Video.findById(videoId)
 
-    if(!isVideoAvl) throw new ApiError(400, "Video not found");
+    if (!isVideoAvl) throw new ApiError(400, "Video not found");
 
-    if(isVideoAvl.isPublished === false){
-        if(isVideoAvl.owner.toString() !== req.user?.id) throw new ApiError(400, "Video not found")
+    if (isVideoAvl.isPublished === false) {
+        if (isVideoAvl.owner.toString() !== req.user?.id) throw new ApiError(400, "Video not found")
     }
 
     const totalComments = await Comment.countDocuments({ video: videoId });
 
     const comments = await Comment.aggregate([
         {
-            $match: { 
-                video: new mongoose.Types.ObjectId(videoId) 
+            $match: {
+                video: new mongoose.Types.ObjectId(videoId)
             }
-        },{
+        }, {
             $lookup: {
                 from: 'users',
                 localField: 'owner',
@@ -46,31 +47,44 @@ const getVideoComments = asyncHandler(async (req, res) => {
                 pipeline: [
                     {
                         $project: {
-                            _id: 1, 
-                            fullName: 1, 
-                            avatar: 1, 
-                            username:1,
+                            _id: 1,
+                            fullName: 1,
+                            avatar: 1,
+                            username: 1,
                             verified: 1,
+                            bio: 1,
+                            createdAt: 1,
                         }
                     }
                 ],
                 as: 'ownerInfo',
             }
         },{
+            $addFields: {
+                ownerInfo: { $first: "$ownerInfo" },
+            }
+        }, {
             $lookup: {
                 from: 'likes',
                 localField: '_id',
                 foreignField: 'comment',
                 as: 'likes',
             }
-        },{
+        }, {
+            $lookup: {
+                from: "subscriptions",
+                localField: "ownerInfo._id",
+                foreignField: "channel",
+                as: "subscribers"
+            }
+        }, {
             $lookup: {
                 from: "comment",
                 localField: "_id",
                 foreignField: "parentComment",
                 as: "replies"
             }
-        },{
+        }, {
             $lookup: {
                 from: "videos",
                 localField: "video",
@@ -85,12 +99,11 @@ const getVideoComments = asyncHandler(async (req, res) => {
                 ],
                 as: "videoInfo"
             }
-        },{
+        }, {
             $addFields: {
-                ownerInfo: {$first: "$ownerInfo"},
-                likesCount: {$size: "$likes"},
-                repliesCount: {$size: "$replies"},
-                videoInfo: {$first: "$videoInfo"},
+                likesCount: { $size: "$likes" },
+                repliesCount: { $size: "$replies" },
+                videoInfo: { $first: "$videoInfo" },
                 isLiked: {
                     $cond: {
                         if: { $in: [req.user?._id, "$likes.likedBy"] },
@@ -98,22 +111,30 @@ const getVideoComments = asyncHandler(async (req, res) => {
                         else: false
                     }
                 },
-                isVideoOwner : {
+                isVideoOwner: {
                     $cond: {
-                        if: { $eq: [ "$owner", {$first: "$videoInfo.owner"} ] },
+                        if: { $eq: ["$owner", { $first: "$videoInfo.owner" }] },
                         then: true,
                         else: false
                     }
                 },
-                isCommentOwner : {
+                isCommentOwner: {
                     $cond: {
-                        if: { $eq: [ "$owner", req.user?._id]},
-                        then: true ,
+                        if: { $eq: ["$owner", req.user?._id] },
+                        then: true,
+                        else: false
+                    }
+                },
+                isSubscribed: {
+                    $cond: {
+                        if: { $in: [req.user?._id, "$subscribers.subscriber"] },
+                        then: true,
                         else: false
                     }
                 }
+
             }
-        },{
+        }, {
             $project: {
                 _id: 1,
                 content: 1,
@@ -125,13 +146,15 @@ const getVideoComments = asyncHandler(async (req, res) => {
                 isLiked: 1,
                 isVideoOwner: 1,
                 isCommentOwner: 1,
+                isSubscribed: 1,
+                subscribers: { $size: "$subscribers" },
                 createdAt: 1
             }
-        },{
+        }, {
             $sort: { [sortBy]: sortType === 'asc' ? 1 : -1 },
-        },{
+        }, {
             $skip: skip,
-        },{
+        }, {
             $limit: limitNumber,
         }
     ])
@@ -153,9 +176,9 @@ const getVideoComments = asyncHandler(async (req, res) => {
 
 const getTweetComments = asyncHandler(async (req, res) => {
     const { tweetId } = req.params
-    const { page = 1, limit = 10, sortBy = 'createdAt', sortType = 'desc'} = req.query
+    const { page = 1, limit = 10, sortBy = 'createdAt', sortType = 'desc' } = req.query
 
-    if(! isValidObjectId(tweetId)) throw new ApiError(400, "tweet id is not valid");
+    if (!isValidObjectId(tweetId)) throw new ApiError(400, "tweet id is not valid");
 
     const pageNumber = parseInt(page);
     const limitNumber = parseInt(limit);
@@ -168,18 +191,18 @@ const getTweetComments = asyncHandler(async (req, res) => {
 
     const skip = (pageNumber - 1) * limitNumber;
 
-    const isTweetAvl = await Tweet.findById( tweetId )
+    const isTweetAvl = await Tweet.findById(tweetId)
 
-    if(!isTweetAvl) throw new ApiError(400, "Tweet not found");
+    if (!isTweetAvl) throw new ApiError(400, "Tweet not found");
 
     const totalComments = await Comment.countDocuments({ tweet: tweetId });
 
     const comments = await Comment.aggregate([
         {
-            $match: { 
-                tweet: new mongoose.Types.ObjectId(tweetId) 
+            $match: {
+                tweet: new mongoose.Types.ObjectId(tweetId)
             }
-        },{
+        }, {
             $lookup: {
                 from: 'users',
                 localField: 'owner',
@@ -187,31 +210,31 @@ const getTweetComments = asyncHandler(async (req, res) => {
                 pipeline: [
                     {
                         $project: {
-                            _id: 1, 
-                            fullName: 1, 
-                            avatar: 1, 
-                            username:1,
+                            _id: 1,
+                            fullName: 1,
+                            avatar: 1,
+                            username: 1,
                             verified: 1,
                         }
                     }
                 ],
                 as: 'ownerInfo',
             }
-        },{
+        }, {
             $lookup: {
                 from: 'likes',
                 localField: '_id',
                 foreignField: 'comment',
                 as: 'likes',
             }
-        },{
+        }, {
             $lookup: {
                 from: "comment",
                 localField: "_id",
                 foreignField: "parentComment",
                 as: "replies"
             }
-        },{
+        }, {
             $lookup: {
                 from: "tweets",
                 localField: "tweet",
@@ -226,12 +249,12 @@ const getTweetComments = asyncHandler(async (req, res) => {
                 ],
                 as: "tweetInfo"
             }
-        },{
+        }, {
             $addFields: {
-                ownerInfo: {$first: "$ownerInfo"},
-                likesCount: {$size: "$likes"},
-                repliesCount: {$size: "$replies"},
-                tweetInfo: {$first: "$tweetInfo"},
+                ownerInfo: { $first: "$ownerInfo" },
+                likesCount: { $size: "$likes" },
+                repliesCount: { $size: "$replies" },
+                tweetInfo: { $first: "$tweetInfo" },
                 isLiked: {
                     $cond: {
                         if: { $in: [req.user?._id, "$likes.likedBy"] },
@@ -239,22 +262,22 @@ const getTweetComments = asyncHandler(async (req, res) => {
                         else: false
                     }
                 },
-                isTweetOwner : {
+                isTweetOwner: {
                     $cond: {
-                        if: { $eq: [ "$owner", {$first: "$tweetInfo.owner"} ] },
+                        if: { $eq: ["$owner", { $first: "$tweetInfo.owner" }] },
                         then: true,
                         else: false
                     }
                 },
-                isCommentOwner : {
+                isCommentOwner: {
                     $cond: {
-                        if: { $eq: [ "$owner", req.user?._id]},
-                        then: true ,
+                        if: { $eq: ["$owner", req.user?._id] },
+                        then: true,
                         else: false
                     }
                 }
             }
-        },{
+        }, {
             $project: {
                 _id: 1,
                 content: 1,
@@ -268,11 +291,11 @@ const getTweetComments = asyncHandler(async (req, res) => {
                 isCommentOwner: 1,
                 createdAt: 1
             }
-        },{
+        }, {
             $sort: { [sortBy]: sortType === 'asc' ? 1 : -1 },
-        },{
+        }, {
             $skip: skip,
-        },{
+        }, {
             $limit: limitNumber,
         }
     ])
@@ -294,9 +317,9 @@ const getTweetComments = asyncHandler(async (req, res) => {
 
 const getReplyComments = asyncHandler(async (req, res) => {
     const { parentCommentId } = req.params
-    const { page = 1, limit = 10} = req.query
+    const { page = 1, limit = 10 } = req.query
 
-    if(! isValidObjectId(parentCommentId)) throw new ApiError(400, "parent id is not valid");
+    if (!isValidObjectId(parentCommentId)) throw new ApiError(400, "parent id is not valid");
 
     const pageNumber = parseInt(page);
     const limitNumber = parseInt(limit);
@@ -309,18 +332,18 @@ const getReplyComments = asyncHandler(async (req, res) => {
 
     const skip = (pageNumber - 1) * limitNumber;
 
-    const isParentAvl = await Comment.findById( parentCommentId )
+    const isParentAvl = await Comment.findById(parentCommentId)
 
-    if(!isParentAvl) throw new ApiError(400, "Parent Comment not found");
+    if (!isParentAvl) throw new ApiError(400, "Parent Comment not found");
 
     const totalComments = await Comment.countDocuments({ parentComment: parentCommentId });
 
     const comments = await Comment.aggregate([
         {
-            $match: { 
-                parentComment: new mongoose.Types.ObjectId(parentCommentId) 
+            $match: {
+                parentComment: new mongoose.Types.ObjectId(parentCommentId)
             }
-        },{
+        }, {
             $lookup: {
                 from: 'users',
                 localField: 'owner',
@@ -328,31 +351,31 @@ const getReplyComments = asyncHandler(async (req, res) => {
                 pipeline: [
                     {
                         $project: {
-                            _id: 1, 
-                            fullName: 1, 
-                            avatar: 1, 
-                            username:1,
+                            _id: 1,
+                            fullName: 1,
+                            avatar: 1,
+                            username: 1,
                             verified: 1,
                         }
                     }
                 ],
                 as: 'ownerInfo',
             }
-        },{
+        }, {
             $lookup: {
                 from: 'likes',
                 localField: '_id',
                 foreignField: 'comment',
                 as: 'likes',
             }
-        },{
+        }, {
             $lookup: {
                 from: "comment",
                 localField: "_id",
                 foreignField: "parentComment",
                 as: "replies"
             }
-        },{
+        }, {
             $lookup: {
                 from: "comments",
                 localField: "replyingTo",
@@ -368,15 +391,15 @@ const getReplyComments = asyncHandler(async (req, res) => {
                                     $project: {
                                         _id: 1,
                                         fullName: 1,
-                                        username:1,
+                                        username: 1,
                                     }
                                 }
                             ],
                             as: 'ownerInfo'
                         }
-                    },{
-                        $addFields: {owner: {$first: "$ownerInfo"}}
-                    },{
+                    }, {
+                        $addFields: { owner: { $first: "$ownerInfo" } }
+                    }, {
                         $project: {
                             _id: 1,
                             content: 1,
@@ -386,7 +409,7 @@ const getReplyComments = asyncHandler(async (req, res) => {
                 ],
                 as: "replyingToComment"
             }
-        },{
+        }, {
             $lookup: {
                 from: "comments",
                 localField: "parentComment",
@@ -401,13 +424,13 @@ const getReplyComments = asyncHandler(async (req, res) => {
                 ],
                 as: "parentCommentInfo"
             }
-        },{
+        }, {
             $addFields: {
-                ownerInfo: {$first: "$ownerInfo"},
-                likesCount: {$size: "$likes"},
-                repliesCount: {$size: "$replies"},
-                parentCommentInfo: {$first: "$parentCommentInfo"},
-                replyingToCommentInfo: {$first: "$replyingToComment"},
+                ownerInfo: { $first: "$ownerInfo" },
+                likesCount: { $size: "$likes" },
+                repliesCount: { $size: "$replies" },
+                parentCommentInfo: { $first: "$parentCommentInfo" },
+                replyingToCommentInfo: { $first: "$replyingToComment" },
                 isLiked: {
                     $cond: {
                         if: { $in: [req.user?._id, "$likes.likedBy"] },
@@ -415,15 +438,15 @@ const getReplyComments = asyncHandler(async (req, res) => {
                         else: false
                     }
                 },
-                isCommentOwner : {
+                isCommentOwner: {
                     $cond: {
-                        if: { $eq: [ "$owner", req.user?._id]},
-                        then: true ,
+                        if: { $eq: ["$owner", req.user?._id] },
+                        then: true,
                         else: false
                     }
                 }
             }
-        },{
+        }, {
             $project: {
                 _id: 1,
                 content: 1,
@@ -437,11 +460,11 @@ const getReplyComments = asyncHandler(async (req, res) => {
                 isCommentOwner: 1,
                 createdAt: 1
             }
-        },{
+        }, {
             $sort: { createdAt: 1 }
-        },{
+        }, {
             $skip: skip,
-        },{
+        }, {
             $limit: limitNumber,
         }
     ])
@@ -468,7 +491,7 @@ const addVideoComment = asyncHandler(async (req, res) => {
     if (!content?.trim()) throw new ApiError(400, "a comment is required")
     if (!isValidObjectId(videoId)) throw new ApiError(400, "video id is not valid")
 
-    const video = await Video.findOne({_id: videoId, isPublished: true})
+    const video = await Video.findOne({ _id: videoId, isPublished: true })
     if (!video) throw new ApiError(404, "video not found")
 
     const comment = await Comment.create({
@@ -484,7 +507,7 @@ const addVideoComment = asyncHandler(async (req, res) => {
         .json(new ApiResponse(200, comment, "Comment added successfully"))
 })
 
-const addTweetComment = asyncHandler(async (req, res)=>{
+const addTweetComment = asyncHandler(async (req, res) => {
     const { tweetId } = req.params
     const { content } = req.body
 
@@ -507,7 +530,7 @@ const addTweetComment = asyncHandler(async (req, res)=>{
         .json(new ApiResponse(200, comment, "Comment added successfully"))
 })
 
-const addReplyComment = asyncHandler(async (req, res)=>{
+const addReplyComment = asyncHandler(async (req, res) => {
     const { parentCommentId, replyingTo } = req.params
     const { content } = req.body
 
