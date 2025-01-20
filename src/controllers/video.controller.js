@@ -10,13 +10,13 @@ import { Like } from "../models/like.model.js"
 
 
 const publishVideo = asyncHandler(async (req, res) => {
-    const { title, description, isPublished } = req.body
+    const { title, description, isPublished, tags } = req.body
     const user = req.user
 
     let videoLocalpath;
     if (req.files && Array.isArray(req.files.video) && req.files.video.length > 0) {
         videoLocalpath = req.files.video[0].path;
-        if (!req.files.video[0].mimetype.includes("video")) {
+        if (!req.files.video[0].mimetype.includes("mp4")) {
             fs.unlinkSync(videoLocalpath)
             if (req.files.thumbnail) fs.unlinkSync(req.files.thumbnail[0].path)
             throw new ApiError(400, "only mp4 file is allowed to upload as video")
@@ -33,10 +33,11 @@ const publishVideo = asyncHandler(async (req, res) => {
         }
     }
 
-    if (!(title && description && videoLocalpath && thumbnailLocalpath && isPublished)) {
+
+    if (!(title && videoLocalpath && thumbnailLocalpath && isPublished)) {
         if (thumbnailLocalpath) fs.unlinkSync(thumbnailLocalpath)
         if (videoLocalpath) fs.unlinkSync(videoLocalpath)
-        throw new ApiError(400, "title, description, ispublished, video and thumbnail all fields are required")
+        throw new ApiError(400, "title, ispublished, video and thumbnail all fields are required")
     }
 
     const video = await cloudinary.upload(videoLocalpath, "videotube/videos/videoFiles")
@@ -48,7 +49,8 @@ const publishVideo = asyncHandler(async (req, res) => {
         videoFile: video.secure_url,
         thumbnail: thumbnail.secure_url,
         title,
-        description,
+        description: description ? description : "",
+        tags: tags ? tags : [],
         duration: Math.round(video.duration),
         isPublished,
         owner: user?._id

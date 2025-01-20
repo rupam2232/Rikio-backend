@@ -5,7 +5,6 @@ import { ApiResponse } from "../utils/ApiResponse.js"
 import { asyncHandler } from "../utils/asyncHandler.js"
 import { Video } from "../models/video.model.js"
 import { Tweet } from "../models/tweet.model.js"
-import { isSubscribed } from "./subscription.controller.js"
 
 const getVideoComments = asyncHandler(async (req, res) => {
     const { videoId } = req.params
