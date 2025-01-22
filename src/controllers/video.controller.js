@@ -40,6 +40,13 @@ const publishVideo = asyncHandler(async (req, res) => {
         throw new ApiError(400, "title, ispublished, video and thumbnail all fields are required")
     }
 
+    let tagsArray = []
+    if(tags){
+        if(Array.isArray(tags)){
+            tagsArray = tags
+        }
+    }
+
     const video = await cloudinary.upload(videoLocalpath, "videotube/videos/videoFiles")
     const thumbnail = await cloudinary.upload(thumbnailLocalpath, "videotube/videos/thumbnailFiles")
 
@@ -50,7 +57,7 @@ const publishVideo = asyncHandler(async (req, res) => {
         thumbnail: thumbnail.secure_url,
         title,
         description: description ? description : "",
-        tags: tags ? tags : [],
+        tags: tagsArray,
         duration: Math.round(video.duration),
         isPublished,
         owner: user?._id
