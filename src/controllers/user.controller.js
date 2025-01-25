@@ -243,7 +243,7 @@ const updateUserAvatar = asyncHandler(async (req, res) => {
                 avatar: avatar.secure_url
             }
         },
-        { new: ture }
+        { new: true }
     ).select("-password")
 
     return res

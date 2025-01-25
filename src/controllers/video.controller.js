@@ -412,6 +412,7 @@ const getAllVideos = asyncHandler(async (req, res) => {
                     uploadDate: 1,
                     views: 1,
                     thumbnail: 1,
+                    tags: 1,
                     isSubscribed: 1,
                     owner: {
                         _id: "$ownerDetails._id",
@@ -471,6 +472,7 @@ const getAllVideos = asyncHandler(async (req, res) => {
                     createdAt: 1,
                     views: 1,
                     isSubscribed: 1,
+                    tags: 1,
                     owner: {
                         _id: "$ownerDetails._id",
                         username: "$ownerDetails.username",
@@ -532,6 +534,7 @@ const getAllVideos = asyncHandler(async (req, res) => {
                     createdAt: 1,
                     views: 1,
                     isSubscribed: 1,
+                    tags: 1,
                     owner: {
                         __id: "$ownerDetails._id",
                         username: "$ownerDetails.username",
