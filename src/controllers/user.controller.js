@@ -24,6 +24,16 @@ const generateAccessAndRefreshTokens = async (userId) => {
     }
 }
 
+const extractNumber = (str) =>{
+    const match = str.match(/^\d+/); 
+  
+    if (match) {
+      return parseInt(match[0]); 
+    } else {
+      return 0;
+    }
+  }
+
 const registerUser = asyncHandler(async (req, res) => {
 
     const { fullName, email, password, username, otp } = req.body
@@ -83,18 +93,18 @@ const loginUser = asyncHandler(async (req, res) => {
 
     const { accessToken, refreshToken } = await generateAccessAndRefreshTokens(user._id);
 
-    const loggedInUser = await User.findById(user._id).select("-password -refreshToken")
+    const loggedInUser = await User.findById(user._id).select("-password -refreshToken -watchHistory -loggedInDevices")
     
     const options = {
         httpOnly: true,
         secure: process.env.NODE_ENV === "production",
         sameSite: "strict",
     }
-
+    
     return res
         .status(200)
-        .cookie("accessToken", accessToken, {...options, maxAge : 3 * 24 * 60 * 60 * 1000})
-        .cookie("refreshToken", refreshToken, {...options, maxAge : 10 * 24 * 60 * 60 * 1000})
+        .cookie("accessToken", accessToken, {...options, maxAge : extractNumber(process.env.ACCESS_TOKEN_EXPIRY) * 24 * 60 * 60 * 1000})
+        .cookie("refreshToken", refreshToken, {...options, maxAge : extractNumber(process.env.REFRESH_TOKEN_EXPIRY) * 24 * 60 * 60 * 1000})
         .json(
             new ApiResponse(
                 200,
@@ -122,7 +132,8 @@ const logoutUser = asyncHandler(async (req, res) => {
 
     const options = {
         httpOnly: true,
-        secure: true
+        secure: process.env.NODE_ENV === "production",
+        sameSite: "strict",
     }
 
     return res
