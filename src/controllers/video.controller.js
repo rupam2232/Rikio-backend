@@ -568,6 +568,7 @@ const getAllVideos = asyncHandler(async (req, res) => {
             {
                 users: channelVideos,
                 videos: videoSearchResults,
+                totalVideo: totalContent,
                 currentPage: pageNumber,
                 totalPages: Math.ceil((totalContent) / limitNumber)
             },
