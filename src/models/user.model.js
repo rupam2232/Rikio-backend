@@ -42,12 +42,6 @@ const userSchema = new Schema({
             ref: "Video"
         }
     ],
-    socials: [
-        {
-            type: Schema.Types.ObjectId,
-            ref: "Social",
-        }
-    ],
     password: {
         type: String,
         required: [true, "Password is required"]
@@ -68,10 +62,6 @@ const userSchema = new Schema({
 }, {
     timestamps: true
 })
-
-// userSchema.path('socials').validate(function (value) {
-//     return value.length <= 5;
-// }, 'You can add a maximum of 5 social accounts.');
 
 userSchema.pre("save", async function (next) {
     if (!this.isModified("password")) return next();

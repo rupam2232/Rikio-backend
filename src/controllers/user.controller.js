@@ -2,7 +2,8 @@ import { asyncHandler } from "../utils/asyncHandler.js"
 import { ApiError } from "../utils/ApiError.js"
 import { User } from "../models/user.model.js"
 import { Video } from "../models/video.model.js"
-import cloudinary  from "../utils/cloudinary.js"
+import { Social } from "../models/socials.model.js"
+import cloudinary from "../utils/cloudinary.js"
 import { ApiResponse } from "../utils/ApiResponse.js"
 import jwt from "jsonwebtoken"
 import mongoose, { isValidObjectId } from "mongoose"
@@ -24,15 +25,15 @@ const generateAccessAndRefreshTokens = async (userId) => {
     }
 }
 
-const extractNumber = (str) =>{
-    const match = str.match(/^\d+/); 
-  
+const extractNumber = (str) => {
+    const match = str.match(/^\d+/);
+
     if (match) {
-      return parseInt(match[0]); 
+        return parseInt(match[0]);
     } else {
-      return 0;
+        return 0;
     }
-  }
+}
 
 const registerUser = asyncHandler(async (req, res) => {
 
@@ -44,7 +45,7 @@ const registerUser = asyncHandler(async (req, res) => {
         throw new ApiError(400, "All fields are required")
     }
 
-    if( req.verifyOtp !== true ) throw new ApiError(400, "Invalid otp")
+    if (req.verifyOtp !== true) throw new ApiError(400, "Invalid otp")
 
     const existedUser = await User.findOne({
         $or: [{ username }, { email }]
@@ -78,7 +79,7 @@ const registerUser = asyncHandler(async (req, res) => {
 
 const loginUser = asyncHandler(async (req, res) => {
     const { username, email, password } = req.body
-    
+
     if (!(username || email)) throw new ApiError(400, "username or email is required")
 
     const user = await User.findOne({
@@ -94,17 +95,17 @@ const loginUser = asyncHandler(async (req, res) => {
     const { accessToken, refreshToken } = await generateAccessAndRefreshTokens(user._id);
 
     const loggedInUser = await User.findById(user._id).select("-password -refreshToken -watchHistory -loggedInDevices")
-    
+
     const options = {
         httpOnly: true,
         secure: process.env.NODE_ENV === "production",
         sameSite: "strict",
     }
-    
+
     return res
         .status(200)
-        .cookie("accessToken", accessToken, {...options, maxAge : extractNumber(process.env.ACCESS_TOKEN_EXPIRY) * 24 * 60 * 60 * 1000})
-        .cookie("refreshToken", refreshToken, {...options, maxAge : extractNumber(process.env.REFRESH_TOKEN_EXPIRY) * 24 * 60 * 60 * 1000})
+        .cookie("accessToken", accessToken, { ...options, maxAge: extractNumber(process.env.ACCESS_TOKEN_EXPIRY) * 24 * 60 * 60 * 1000 })
+        .cookie("refreshToken", refreshToken, { ...options, maxAge: extractNumber(process.env.REFRESH_TOKEN_EXPIRY) * 24 * 60 * 60 * 1000 })
         .json(
             new ApiResponse(
                 200,
@@ -186,7 +187,7 @@ const refreshAccessToken = asyncHandler(async (req, res) => {
 const changeCurrentPassword = asyncHandler(async (req, res) => {
     const { oldPassword, newPassword } = req.body
 
-    if(!(oldPassword && newPassword)) throw new ApiError(400, "old and new both passwords are required")
+    if (!(oldPassword && newPassword)) throw new ApiError(400, "old and new both passwords are required")
     const user = await User.findById(req.user?._id)
 
     const isPasswordCorrect = await user.isPasswordCorrect(oldPassword)
@@ -235,10 +236,10 @@ const updateUserAvatar = asyncHandler(async (req, res) => {
     const avatarLocalPath = req.file?.path
 
     if (!avatarLocalPath) throw new ApiError(400, "Avatar file is missing")
-    if (! req.file.mimetype.includes("image")){
+    if (!req.file.mimetype.includes("image")) {
         fs.unlinkSync(req.file.path)
-         throw new ApiError(400, "Only images are allowed to upload")
-        }
+        throw new ApiError(400, "Only images are allowed to upload")
+    }
 
     const avatar = await cloudinary.upload(avatarLocalPath, "videotube/users")
 
@@ -268,7 +269,7 @@ const updateUserCoverImage = asyncHandler(async (req, res) => {
     const coverImageLocalPath = req.file?.path
 
     if (!coverImageLocalPath) throw new ApiError(400, "Cover file is missing")
-    if (req.file.mimetype.includes("gif") || !req.file.mimetype.includes("image")){ 
+    if (req.file.mimetype.includes("gif") || !req.file.mimetype.includes("image")) {
         fs.unlinkSync(req.file.path)
         throw new ApiError(400, "Only images are allowed to upload")
     }
@@ -278,7 +279,7 @@ const updateUserCoverImage = asyncHandler(async (req, res) => {
     if (!coverImage.secure_url) throw new ApiError(500, "Error while uploading cover image")
 
     const oldUser = await User.findById(req.user?.id)
-    if(oldUser?.coverImage) await cloudinary.delete(oldUser.coverImage)
+    if (oldUser?.coverImage) await cloudinary.delete(oldUser.coverImage)
 
     const user = await User.findByIdAndUpdate(
         req.user?._id,
@@ -318,10 +319,10 @@ const getUserChannelProfile = asyncHandler(async (req, res) => {
         },
         {
             $lookup: {
-                from: "subscriptions",
+                from: "socials",
                 localField: "_id",
-                foreignField: "subscriber",
-                as: "subscribedTo"
+                foreignField: "user",
+                as: "socials"
             }
         },
         {
@@ -329,10 +330,10 @@ const getUserChannelProfile = asyncHandler(async (req, res) => {
                 subscribersCount: {
                     $size: "$subscribers"
                 },
-                channelsSubscibedToCount: {
-                    $size: "$subscribedTo"
+                socials: {
+                    $first: "$socials"
                 },
-                isChannelOwner:{
+                isChannelOwner: {
                     $cond: {
                         if: { $eq: [req.user?._id, "$_id"] },
                         then: true,
@@ -352,8 +353,9 @@ const getUserChannelProfile = asyncHandler(async (req, res) => {
             $project: {
                 fullName: 1,
                 username: 1,
+                bio: 1,
+                socials: 1,
                 subscribersCount: 1,
-                channelsSubscibedToCount: 1,
                 isSubscribed: 1,
                 isChannelOwner: 1,
                 avatar: 1,
@@ -380,8 +382,8 @@ const getWatchHistory = asyncHandler(async (req, res) => {
     const findUser = await User.findById(req.user._id)
     if (!findUser) throw new ApiError(404, "User does not exists")
 
-    const page = parseInt(req.query.page, 10) || 1; 
-    const limit = parseInt(req.query.limit, 10) || 10; 
+    const page = parseInt(req.query.page, 10) || 1;
+    const limit = parseInt(req.query.limit, 10) || 10;
     if (page < 1 || limit < 1) {
         return res
             .status(400)
@@ -394,13 +396,13 @@ const getWatchHistory = asyncHandler(async (req, res) => {
             $match: {
                 _id: new mongoose.Types.ObjectId(req.user._id)
             }
-        },{
+        }, {
             $project: {
                 watchHistory: { $reverseArray: "$watchHistory" }, // Reverse the array to get the desired order
             },
-        },{
+        }, {
             $unwind: "$watchHistory"
-        },{
+        }, {
             $lookup: {
                 from: "videos",
                 localField: "watchHistory",
@@ -408,9 +410,9 @@ const getWatchHistory = asyncHandler(async (req, res) => {
                 as: "watchHistory",
                 pipeline: [
                     {
-                        $match: {isPublished: true}
-                    },{
-                        $sort: {createdAt: -1}
+                        $match: { isPublished: true }
+                    }, {
+                        $sort: { createdAt: -1 }
                     },
                     {
                         $lookup: {
@@ -437,7 +439,7 @@ const getWatchHistory = asyncHandler(async (req, res) => {
                                 $first: "$owner"
                             }
                         }
-                    },{
+                    }, {
                         $project: {
                             _id: 1,
                             thumbnail: 1,
@@ -450,19 +452,19 @@ const getWatchHistory = asyncHandler(async (req, res) => {
                     }
                 ]
             }
-        },{
+        }, {
             $unwind: "$watchHistory"
-        },{
+        }, {
             $replaceRoot: { newRoot: "$watchHistory" }, // Replace root with video documents
-        },{
-            $skip: skip, 
-        },{
+        }, {
+            $skip: skip,
+        }, {
             $limit: limit,
-        },{
+        }, {
             $group: {
                 _id: null,
                 watchHistory: { $push: "$$ROOT" }
-                }
+            }
         }
     ])
 
@@ -473,58 +475,87 @@ const getWatchHistory = asyncHandler(async (req, res) => {
         )
 })
 
-const pushVideoToWatchHistory = asyncHandler(async (req,res)=>{
-    const {videoId} = req.params
-    if(! isValidObjectId(videoId)) throw new ApiError(400, "video id is not a valid object id")
+const pushVideoToWatchHistory = asyncHandler(async (req, res) => {
+    const { videoId } = req.params
+    if (!isValidObjectId(videoId)) throw new ApiError(400, "video id is not a valid object id")
 
-    const isVideoAvl = await Video.findOne({_id: videoId, isPublished: true})
+    const isVideoAvl = await Video.findOne({ _id: videoId, isPublished: true })
 
-    if( !isVideoAvl ) throw new ApiError(400, "video not found")
+    if (!isVideoAvl) throw new ApiError(400, "video not found")
 
-    const user = await User.findByIdAndUpdate(req.user?._id,{
-        $push: {watchHistory: isVideoAvl._id},
-    },{
+    const user = await User.findByIdAndUpdate(req.user?._id, {
+        $push: { watchHistory: isVideoAvl._id },
+    }, {
         new: true,
         validateBeforeSave: false
     }).select("watchHistory _id username")
 
-    if(! user) throw new ApiError(400, "User not found")
+    if (!user) throw new ApiError(400, "User not found")
 
     return res
-    .status(200)
-    .json(new ApiResponse(200, user, "Video added to watchHistory successfully"))
+        .status(200)
+        .json(new ApiResponse(200, user, "Video added to watchHistory successfully"))
 })
 
-const checkIfUsernameIsAvl = asyncHandler(async (req,res)=>{
-    const {username} = req.params
+const checkIfUsernameIsAvl = asyncHandler(async (req, res) => {
+    const { username } = req.params
 
-    const user = await User.findOne({username})
+    const user = await User.findOne({ username })
 
-    if(user){
+    if (user) {
         return res
-        .status(200)
-        .json(new ApiResponse(200, false , `@${username} is unavailable`))
-    }else{
+            .status(200)
+            .json(new ApiResponse(200, false, `@${username} is unavailable`))
+    } else {
         return res
-        .status(200)
-        .json(new ApiResponse(200, true , `@${username} is available`))
+            .status(200)
+            .json(new ApiResponse(200, true, `@${username} is available`))
     }
 })
 
-const checkIfEmailIsAvl = asyncHandler(async (req,res)=>{
-    const {email} = req.params
+const checkIfEmailIsAvl = asyncHandler(async (req, res) => {
+    const { email } = req.params
 
-    const user = await User.findOne({email})
+    const user = await User.findOne({ email })
 
-    if(user){
+    if (user) {
         return res
-        .status(200)
-        .json(new ApiResponse(200, false , `${email} is already in use`))
-    }else{
+            .status(200)
+            .json(new ApiResponse(200, false, `${email} is already in use`))
+    } else {
         return res
-        .status(200)
-        .json(new ApiResponse(200, true , `${email} is available`))
+            .status(200)
+            .json(new ApiResponse(200, true, `${email} is available`))
     }
+})
+
+const addSocials = asyncHandler(async (req, res) => {
+    const { facebook, instagram, linkedin, github, website, x } = req.body
+
+    let socials = await Social.findOne({ user: req.user._id })
+    if (!socials) {
+        socials = new Social({
+            user: req.user._id,
+            facebook: facebook ? facebook : null,
+            instagram: instagram ? instagram : null,
+            linkedin: linkedin ? linkedin : null,
+            github: github ? github : null,
+            website: website ? website : null,
+            x: x ? x : null
+        })
+    }else{
+        socials.facebook = facebook ? facebook : null
+        socials.instagram = instagram ? instagram : null
+        socials.linkedin = linkedin ? linkedin : null
+        socials.github = github ? github : null
+        socials.website = website ? website : null
+        socials.x = x ? x : null
+    }
+    await socials.save()
+
+    return res
+        .status(201)
+        .json(new ApiResponse(201, socials, "Socials added successfully"))
 })
 
 export {
@@ -541,5 +572,6 @@ export {
     getWatchHistory,
     pushVideoToWatchHistory,
     checkIfUsernameIsAvl,
-    checkIfEmailIsAvl
+    checkIfEmailIsAvl,
+    addSocials
 }

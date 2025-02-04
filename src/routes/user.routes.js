@@ -13,7 +13,8 @@ import {
     updateUserAvatar, 
     updateUserCoverImage,
     checkIfUsernameIsAvl,
-    checkIfEmailIsAvl
+    checkIfEmailIsAvl,
+    addSocials
 } from "../controllers/user.controller.js"
 import { upload } from "../middlewares/multer.middleware.js"
 import {verifyJWT} from "../middlewares/auth.middleware.js"
@@ -49,5 +50,7 @@ router.route("/add-history/:videoId").post(verifyJWT, pushVideoToWatchHistory)
 router.route("/check-username/:username").get(optionalVerifyJWT, checkIfUsernameIsAvl)
 
 router.route("/check-email/:email").get(optionalVerifyJWT, checkIfEmailIsAvl)
+
+router.route("/add-socials").post(verifyJWT, addSocials)
 
 export default router
