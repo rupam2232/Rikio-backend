@@ -129,7 +129,7 @@ const updateTweet = asyncHandler(async(req, res)=>{
     if(allImage){
         if(allImage.length > 4){
             for(let i = 0; i < currentImage.length; i++){
-                await cloudinary.delete(currentImage[i])
+                await cloudinary.deleteImage(currentImage[i])
             }
             throw new ApiError(400, "Only 4 files are allowed to upload");
         } 
@@ -143,7 +143,7 @@ const updateTweet = asyncHandler(async(req, res)=>{
         if(deleteImage.length > 0){
             for(let i = 0; i < deleteImage.length; i++){
                 const image = deleteImage[i]
-                await cloudinary.delete(image)
+                await cloudinary.deleteImage(image)
             }
         }
     }
@@ -169,7 +169,7 @@ const deleteTweet = asyncHandler(async(req, res)=>{
         if(tweet.content.image.length > 0){
             for(let i = 0; i < tweet.content.image.length; i++){
                 const image = tweet.content.image[i]
-                await cloudinary.delete(image)
+                await cloudinary.deleteImage(image)
             }
         }
         await Tweet.findByIdAndDelete(tweet._id)

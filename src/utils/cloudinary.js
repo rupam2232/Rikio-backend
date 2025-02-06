@@ -33,10 +33,26 @@ export class Cloudinaryopt{
 
     }
 
-    async delete (imageURL){
+    async deleteImage (imageURL){
         try{
             const publicId = (imageURL) => imageURL.split("/").pop().split(".")[0];
-            const response = await this.cloudinary.uploader.destroy(publicId(imageURL))
+            const response = await this.cloudinary.uploader.destroy(publicId(imageURL), {
+                resource_type: 'image',
+                invalidate: true
+              })
+            return response;
+        }catch(err){
+            throw err;
+        }
+    }
+
+    async deleteVideo (videoURL){
+        try{
+            const publicId = (videoURL) => videoURL.split("/").pop().split(".")[0];
+            const response = await this.cloudinary.uploader.destroy(publicId(videoURL), {
+                resource_type: 'video',
+                invalidate: true
+              })
             return response;
         }catch(err){
             throw err;

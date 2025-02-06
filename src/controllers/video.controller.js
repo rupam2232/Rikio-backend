@@ -7,6 +7,7 @@ import { Video } from "../models/video.model.js"
 import fs from "fs"
 import mongoose, { isValidObjectId } from "mongoose"
 import { Like } from "../models/like.model.js"
+import { Comment } from "../models/comment.model.js"
 
 
 const publishVideo = asyncHandler(async (req, res) => {
@@ -165,7 +166,7 @@ const updateVideo = asyncHandler(async (req, res) => {
             throw new ApiError(400, "only images are allowed to upload for thumbnail")
         }
         if (video.thumbnail) {
-            await cloudinary.delete(video.thumbnail)
+            await cloudinary.deleteImage(video.thumbnail)
         }
         const thumbnail = await cloudinary.upload(thumbnailLocalpath, "videotube/videos/thumbnailFiles")
 
@@ -187,12 +188,14 @@ const deleteVideo = asyncHandler(async (req, res) => {
     const video = await Video.findOne({ _id: videoId, owner: user })
     if (!video) throw new ApiError(400, "video not found")
 
-    await cloudinary.delete(video.videoFile)
-    await cloudinary.delete(video.thumbnail)
+    await cloudinary.deleteVideo(video.videoFile)
+    await cloudinary.deleteImage(video.thumbnail)
     await Video.deleteOne({ _id: videoId, owner: user })
+    await Comment.deleteMany({video: video._id})
+    await Like.deleteMany({video: video._id})
     return res
         .status(200)
-        .json(new ApiResponse(200, {}, `${videoId} video deleted successfully`))
+        .json(new ApiResponse(200, true, `${videoId} video deleted successfully`))
 })
 
 const togglePublishStatus = asyncHandler(async (req, res) => {

@@ -247,7 +247,7 @@ const updateUserAvatar = asyncHandler(async (req, res) => {
     if (!avatar.secure_url) throw new ApiError(500, "Error while uploading avatar")
 
     const oldUser = await User.findById(req.user?.id)
-    await cloudinary.delete(oldUser.avatar)
+    await cloudinary.deleteImage(oldUser.avatar)
 
     const user = await User.findByIdAndUpdate(
         req.user?._id,
@@ -280,7 +280,7 @@ const updateUserCoverImage = asyncHandler(async (req, res) => {
     if (!coverImage.secure_url) throw new ApiError(500, "Error while uploading cover image")
 
     const oldUser = await User.findById(req.user?.id)
-    if (oldUser?.coverImage) await cloudinary.delete(oldUser.coverImage)
+    if (oldUser?.coverImage) await cloudinary.deleteImage(oldUser.coverImage)
 
     const user = await User.findByIdAndUpdate(
         req.user?._id,
