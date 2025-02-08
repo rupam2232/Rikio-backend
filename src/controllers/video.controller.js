@@ -7,7 +7,6 @@ import { Video } from "../models/video.model.js"
 import fs from "fs"
 import mongoose, { isValidObjectId } from "mongoose"
 import { Like } from "../models/like.model.js"
-import { Comment } from "../models/comment.model.js"
 
 
 const publishVideo = asyncHandler(async (req, res) => {
@@ -191,7 +190,6 @@ const deleteVideo = asyncHandler(async (req, res) => {
     await cloudinary.deleteVideo(video.videoFile)
     await cloudinary.deleteImage(video.thumbnail)
     await Video.deleteOne({ _id: videoId, owner: user })
-    await Comment.deleteMany({video: video._id})
     await Like.deleteMany({video: video._id})
     return res
         .status(200)
@@ -202,7 +200,7 @@ const togglePublishStatus = asyncHandler(async (req, res) => {
     const { videoId } = req.params
     const { isPublished } = req.body
 
-    if (!req.body) throw new ApiError(400, "isPublished need to submit")
+    if (!req.body || (isPublished !== true && isPublished !== false)) throw new ApiError(400, "isPublished need to submit")
     if (!isValidObjectId(videoId)) throw new ApiError(400, "video id is not valid")
     const updatedVideo = await Video.findOneAndUpdate(
         {
