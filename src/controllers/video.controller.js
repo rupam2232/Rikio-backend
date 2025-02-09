@@ -41,8 +41,8 @@ const publishVideo = asyncHandler(async (req, res) => {
     }
 
     let tagsArray = []
-    if(tags){
-        if(Array.isArray(tags)){
+    if (tags) {
+        if (Array.isArray(tags)) {
             tagsArray = tags
         }
     }
@@ -71,12 +71,12 @@ const publishVideo = asyncHandler(async (req, res) => {
 const getVideoById = asyncHandler(async (req, res) => {
     const { videoId } = req.params
     if (!videoId) throw new ApiError(400, "not get videoId")
-    
-    if(!isValidObjectId(videoId)) throw new ApiError(400, "Video id is not valid")
 
-    const isVideoAvl = await Video.findOne({_id: videoId, isPublished: true})
+    if (!isValidObjectId(videoId)) throw new ApiError(400, "Video id is not valid")
 
-    if(!isVideoAvl) throw new ApiError(400, "Video not found")
+    const isVideoAvl = await Video.findOne({ _id: videoId, isPublished: true })
+
+    if (!isVideoAvl) throw new ApiError(400, "Video not found")
 
     const video = await Video.aggregate([
         {
@@ -138,26 +138,34 @@ const getVideoById = asyncHandler(async (req, res) => {
 
     return res
         .status(200)
-        .json(new ApiResponse(200, { video: video[0], likes: likes[0]? likes[0] : {totalLikes : 0, isLiked: false} }, `data of ${videoId}`))
+        .json(new ApiResponse(200, { video: video[0], likes: likes[0] ? likes[0] : { totalLikes: 0, isLiked: false } }, `data of ${videoId}`))
 
 })
 
 const updateVideo = asyncHandler(async (req, res) => {
-    const { title, description } = req.body
+    const { title, description, tags } = req.body
     const thumbnailLocalpath = req.file?.path
     const { videoId } = req.params
     const user = req.user?.id
 
-    if (!(title && description)) throw new ApiError(400, "title and description is required")
+    if (!title) throw new ApiError(400, "title is required")
 
     const video = await Video.findById(videoId)
 
     if (video.owner.toString() !== user) throw new ApiError(400, "You are not authorized to perform this action")
 
-    if (title.replace(/\s+/g, '') === "" || description.replace(/\s+/g, '') === "") throw new ApiError(400, "Need valid an input for title and description")
+    if (title.replace(/\s+/g, '') === "") throw new ApiError(400, "Need valid a input for title")
+
+    let tagsArray = []
+    if (tags) {
+        if (Array.isArray(tags)) {
+            tagsArray = tags
+        }
+    }
 
     video.title = title
     video.description = description
+    video.tags = tagsArray
 
     if (thumbnailLocalpath) {
         if (!req.file.mimetype.includes("image") || req.file.mimetype.includes("gif")) {
@@ -190,7 +198,7 @@ const deleteVideo = asyncHandler(async (req, res) => {
     await cloudinary.deleteVideo(video.videoFile)
     await cloudinary.deleteImage(video.thumbnail)
     await Video.deleteOne({ _id: videoId, owner: user })
-    await Like.deleteMany({video: video._id})
+    await Like.deleteMany({ video: video._id })
     return res
         .status(200)
         .json(new ApiResponse(200, true, `${videoId} video deleted successfully`))
@@ -242,21 +250,21 @@ const getAllVideos = asyncHandler(async (req, res) => {
         const searchingChannel = await User.findOne({ username: channelSearch })
         if (!searchingChannel) throw new ApiError(400, "Channel not found");
 
-        const countChannelsVideo = await Video.countDocuments({owner: searchingChannel._id, isPublished: true})
+        const countChannelsVideo = await Video.countDocuments({ owner: searchingChannel._id, isPublished: true })
 
         const channelsAllVideo = await Video.aggregate([
             {
                 $match: {
-                    owner: searchingChannel._id, 
+                    owner: searchingChannel._id,
                     isPublished: true
                 }
-            },{
+            }, {
                 $sort: { [sortBy]: sortType === 'asc' ? 1 : -1 }
-            },{
+            }, {
                 $skip: (pageNumber - 1) * limitNumber
-            },{
+            }, {
                 $limit: limitNumber
-            },{
+            }, {
                 $lookup: {
                     from: "users",
                     localField: "owner",
@@ -264,10 +272,10 @@ const getAllVideos = asyncHandler(async (req, res) => {
                     pipeline: [
                         {
                             $project: {
-                                _id: 1, 
+                                _id: 1,
                                 username: 1,
                                 verified: 1,
-                                fullName: 1, 
+                                fullName: 1,
                                 avatar: 1,
                                 bio: 1,
                                 createdAt: 1
@@ -276,11 +284,11 @@ const getAllVideos = asyncHandler(async (req, res) => {
                     ],
                     as: "owner"
                 }
-            },{
+            }, {
                 $addFields: {
                     owner: { $first: "$owner" }
                 }
-            },{
+            }, {
                 $project: {
                     _id: 1,
                     owner: 1,
@@ -387,14 +395,14 @@ const getAllVideos = asyncHandler(async (req, res) => {
             },
             {
                 $unwind: "$ownerDetails"
-            },{
+            }, {
                 $lookup: {
                     from: "subscriptions",
                     localField: "owner",
                     foreignField: "channel",
                     as: "subscribers"
                 }
-            },{
+            }, {
                 $addFields: {
                     isSubscribed: {
                         $cond: {
@@ -445,15 +453,15 @@ const getAllVideos = asyncHandler(async (req, res) => {
                 }
             },
             {
-                $unwind: "$ownerDetails" 
-            },{
+                $unwind: "$ownerDetails"
+            }, {
                 $lookup: {
                     from: "subscriptions",
                     localField: "owner",
                     foreignField: "channel",
                     as: "subscribers"
                 }
-            },{
+            }, {
                 $addFields: {
                     isSubscribed: {
                         $cond: {
@@ -508,14 +516,14 @@ const getAllVideos = asyncHandler(async (req, res) => {
             },
             {
                 $unwind: "$ownerDetails"
-            },,{
+            }, , {
                 $lookup: {
                     from: "subscriptions",
                     localField: "owner",
                     foreignField: "channel",
                     as: "subscribers"
                 }
-            },{
+            }, {
                 $addFields: {
                     isSubscribed: {
                         $cond: {
