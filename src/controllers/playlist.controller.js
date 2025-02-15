@@ -7,12 +7,12 @@ import {asyncHandler} from "../utils/asyncHandler.js"
 
 
 const createPlaylist = asyncHandler(async (req, res) => {
-    //TODO: create playlist
-    const {playlistName, description} = req.body
-    if(! playlistName) throw new ApiError(400, "a name is required for playlist")
+    const {playlistName, description, isPublic} = req.body
+    if(! playlistName, isPublic) throw new ApiError(400, "a name and isPublic is required for playlist")
 
     const createdPlaylist = await Playlist.create({
         playlistName,
+        isPublic,
         description : description? description: null,
         owner: req.user?._id
     })
@@ -23,108 +23,29 @@ const createPlaylist = asyncHandler(async (req, res) => {
 })
 
 const getUserPlaylists = asyncHandler(async (req, res) => {
-    const {userId} = req.params
-    //TODO: get user playlists
 
-    if(! userId) throw new ApiError(400, "please give a userId to procced")
+    const userPlaylists = await Playlist.find({owner: req.user?._id})
 
-    const userPlaylists = await Playlist.find({owner: userId})
-    if(userPlaylists.length <= 0) throw new ApiError(400, "UserId don't have any playlist")
     return res
     .status(200)
     .json(new ApiResponse(200, userPlaylists, "User playlists retrieved successfully"))
 })
 
-const getPlaylistById = asyncHandler(async (req, res) => {
-    const {playlistId} = req.params
-    //TODO: get playlist by id
-    if(! playlistId) throw new ApiError(400, "please give a playlistId")
-    // const playlist = await Playlist.findById(playlistId).populate("owner")
+const getChannelPlaylists = asyncHandler(async (req, res) => {
+    const {channelId} = req.params
 
-    // const playlist = await Playlist.aggregate([
-    //     {
-    //         $match: { 
-    //             _id: new mongoose.Types.ObjectId(playlistId) 
-    //         }
-    //     },{
-    //         $lookup: {
-    //             from: "users",
-    //             localField: "owner",
-    //             foreignField: "_id",
-    //             as: "owner",
-    //         }
-    //     },{
-    //         $lookup: {
-    //             from: "videos",
-    //             localField: "videos",
-    //             foreignField: "_id",
-    //             as: "videos",
-    //             pipeline: [
-    //                 {
-    //                     $match: {isPublished : true}
-    //                 },{
-    //                     $lookup: {
-    //                         from: "users",
-    //                         localField: "owner",
-    //                         foreignField: "_id",
-    //                         as: "owner",
-    //                         pipeline: [
-    //                             {
-    //                                 $project: {
-    //                                     fullName: 1,
-    //                                     username: 1,
-    //                                     avatar: 1
-    //                                 }
-    //                             }
-    //                         ]
-    //                     }
-    //                 },{
-    //                     $addFields: {
-    //                         owner: {
-    //                             $first: "$owner"
-    //                         }
-    //                     }
-    //                 },{
-    //                     $project: {
-    //                         _id: 1,
-    //                         title: 1,
-    //                         thumbnail: 1,
-    //                         duration: 1,
-    //                         views: 1,
-    //                         isPublished: 1,
-    //                         owner: 1,
-    //                         createdAt: 1,
-    //                     }
-    //                 }
-    //             ]
-    //         }
-    //     },{
-    //         $unwind: "$owner"
-    //     },{
-    //         $unwind: "$videos"
-    //     },{
-    //         $group: {
-    //             _id: "$_id",
-    //             owner: {"$first": {
-    //                 _id: "$owner._id",
-    //                 fullName: "$owner.fullName",
-    //                 username: "$owner.username",
-    //                 avatar: "$owner.avatar"
-    //             }},
-    //             videos: {"$push": "$videos"},
-    //         }
-    //     }
-    // ])
+    if(! channelId) throw new ApiError(400, "please give a userId to procced")
+
+    const channelPlaylists = await Playlist.find({owner: channelId, isPublic: true}).sort({createdAt: 1})
 
     const playlist = await Playlist.aggregate([
-        // Match the specific playlist
         {
             $match: {
-                _id: new mongoose.Types.ObjectId(playlistId)
+                owner: new mongoose.Types.ObjectId(channelId),
+                isPublic: true
             }
         },
     
-        // Lookup owner details
         {
             $lookup: {
                 from: "users",
@@ -214,6 +135,114 @@ const getPlaylistById = asyncHandler(async (req, res) => {
                 videos: 1
             }
         }
+    ]);  
+
+    return res
+    .status(200)
+    .json(new ApiResponse(200, channelPlaylists, "Channel playlists retrieved successfully"))
+})
+
+const getPlaylistById = asyncHandler(async (req, res) => {
+    const {playlistId} = req.params
+    if(! playlistId) throw new ApiError(400, "please give a playlistId")
+
+    const playlist = await Playlist.aggregate([
+        {
+            $match: {
+                _id: new mongoose.Types.ObjectId(playlistId)
+            }
+        },
+    
+        {
+            $lookup: {
+                from: "users",
+                localField: "owner",
+                foreignField: "_id",
+                pipeline: [
+                    {
+                        $project: { 
+                            _id: 1, 
+                            fullName: 1, 
+                            username: 1, 
+                            avatar: 1,
+                            verified: 1, 
+                        }
+                    }
+                ],
+                as: "owner"
+            }
+        },
+    
+        // Lookup videos with nested lookup for their owner
+        {
+            $lookup: {
+                from: "videos",
+                let: { videoIds: "$videos" },
+                pipeline: [
+                    {
+                        $match: {
+                            $expr: {
+                                $and: [
+                                    { $in: ["$_id", "$$videoIds"] },
+                                    { $eq: ["$isPublished", true] }
+                                ]
+                            }
+                        }
+                    },
+                    {
+                        $lookup: {
+                            from: "users",
+                            localField: "owner",
+                            foreignField: "_id",
+                            pipeline: [
+                                {
+                                    $project: {
+                                        _id: 1,
+                                        fullName: 1,
+                                        username: 1,
+                                        avatar: 1
+                                    }
+                                }
+                            ],
+                            as: "owner"
+                        }
+                    },
+                    {
+                        $addFields: {
+                            owner: { $first: "$owner" } // Flatten the nested owner array
+                        }
+                    },
+                    {
+                        $project: {
+                            _id: 1,
+                            title: 1,
+                            thumbnail: 1,
+                            duration: 1,
+                            views: 1,
+                            createdAt: 1,
+                            owner: 1 // Include nested owner details
+                        }
+                    }
+                ],
+                as: "videos"
+            }
+        },
+    
+        // Flatten owner array since it’s always a single owner
+        {
+            $addFields: {
+                owner: { $first: "$owner" }
+            }
+        },
+    
+        // Reshape the final result
+        {
+            $project: {
+                _id: 1,
+                owner: 1,
+                videos: 1
+            }
+        }
     ]);    
 
     if(playlist.length > 0)return res.status(200).json(new ApiResponse(200, playlist[0], "Playlist fetched successfully"))
@@ -223,7 +252,6 @@ const getPlaylistById = asyncHandler(async (req, res) => {
 })
 
 const addVideoToPlaylist = asyncHandler(async (req, res) => {
-    //TODO: add video to playlist
     const {playlistId, videoId} = req.params
     if(! playlistId) throw new ApiError(400, "please give a playlistId")
     if(! videoId) throw new ApiError(400, "please give a videoId")
@@ -252,7 +280,6 @@ const addVideoToPlaylist = asyncHandler(async (req, res) => {
 
 const removeVideoFromPlaylist = asyncHandler(async (req, res) => {
     const {playlistId, videoId} = req.params
-    // TODO: remove video from playlist
 
     if(! playlistId) throw new ApiError(400, "please give a playlistId")
     if(! videoId) throw new ApiError(400, "please give a videoId")
@@ -277,7 +304,6 @@ const removeVideoFromPlaylist = asyncHandler(async (req, res) => {
 
 const deletePlaylist = asyncHandler(async (req, res) => {
     const {playlistId} = req.params
-    // TODO: delete playlist
     if(! playlistId) throw new ApiError(400, "please give a playlistId")
     const deletedPlaylist = await Playlist.findOneAndDelete({_id: playlistId, owner: req.user?._id})
     if( deletedPlaylist ){
@@ -292,7 +318,6 @@ const deletePlaylist = asyncHandler(async (req, res) => {
 const updatePlaylist = asyncHandler(async (req, res) => {
     const {playlistId} = req.params
     const {playlistName, description} = req.body
-    //TODO: update playlist
     if(! playlistId) throw new ApiError(400, "please give a playlistId")
     if(! playlistName) throw new ApiError(400, "please give a playlistName")
 
@@ -313,6 +338,7 @@ const updatePlaylist = asyncHandler(async (req, res) => {
 export {
     createPlaylist,
     getUserPlaylists,
+    getChannelPlaylists,
     getPlaylistById,
     addVideoToPlaylist,
     removeVideoFromPlaylist,
