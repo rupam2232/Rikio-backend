@@ -18,7 +18,7 @@ const playlistSchema = new Schema({
     },
     isPublic: {
         type: Boolean,
-        default: true,
+        default: false,
         required: true
     }
 }, {

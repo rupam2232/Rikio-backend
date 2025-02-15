@@ -8,7 +8,7 @@ import {asyncHandler} from "../utils/asyncHandler.js"
 
 const createPlaylist = asyncHandler(async (req, res) => {
     const {playlistName, description, isPublic} = req.body
-    if(! playlistName, isPublic) throw new ApiError(400, "a name and isPublic is required for playlist")
+    if(! playlistName || !isPublic) throw new ApiError(400, "a name and isPublic is required for playlist")
 
     const createdPlaylist = await Playlist.create({
         playlistName,
@@ -36,8 +36,6 @@ const getChannelPlaylists = asyncHandler(async (req, res) => {
 
     if(! channelId) throw new ApiError(400, "please give a userId to procced")
 
-    const channelPlaylists = await Playlist.find({owner: channelId, isPublic: true}).sort({createdAt: 1})
-
     const playlist = await Playlist.aggregate([
         {
             $match: {
@@ -45,27 +43,6 @@ const getChannelPlaylists = asyncHandler(async (req, res) => {
                 isPublic: true
             }
         },
-    
-        {
-            $lookup: {
-                from: "users",
-                localField: "owner",
-                foreignField: "_id",
-                pipeline: [
-                    {
-                        $project: { 
-                            _id: 1, 
-                            fullName: 1, 
-                            username: 1, 
-                            avatar: 1 
-                        }
-                    }
-                ],
-                as: "owner"
-            }
-        },
-    
-        // Lookup videos with nested lookup for their owner
         {
             $lookup: {
                 from: "videos",
@@ -82,64 +59,44 @@ const getChannelPlaylists = asyncHandler(async (req, res) => {
                         }
                     },
                     {
-                        $lookup: {
-                            from: "users",
-                            localField: "owner",
-                            foreignField: "_id",
-                            pipeline: [
-                                {
-                                    $project: {
-                                        _id: 1,
-                                        fullName: 1,
-                                        username: 1,
-                                        avatar: 1
-                                    }
-                                }
-                            ],
-                            as: "owner"
-                        }
-                    },
-                    {
-                        $addFields: {
-                            owner: { $first: "$owner" } // Flatten the nested owner array
-                        }
-                    },
-                    {
                         $project: {
                             _id: 1,
-                            title: 1,
                             thumbnail: 1,
-                            duration: 1,
-                            views: 1,
-                            createdAt: 1,
-                            owner: 1 // Include nested owner details
+                            views: 1
                         }
                     }
                 ],
                 as: "videos"
             }
         },
-    
-        // Flatten owner array since it’s always a single owner
         {
             $addFields: {
-                owner: { $first: "$owner" }
+                totalVideos: { $size: "$videos" }, // Count the number of videos
+                totalViews: { $sum: "$videos.views" }, // Sum up the views of all videos
+                thumbnail: { $arrayElemAt: ["$videos.thumbnail", 0] } // Get the first video's thumbnail
             }
         },
-    
-        // Reshape the final result
         {
             $project: {
                 _id: 1,
-                owner: 1,
-                videos: 1
+                playlistName: 1,
+                createdAt: 1,
+                totalVideos: 1,
+                totalViews: 1,
+                thumbnail: 1
+            }
+        },
+        {
+            $sort: {
+                createdAt: -1
             }
         }
-    ]);  
-
+    ]);
+    
+    
     return res
     .status(200)
-    .json(new ApiResponse(200, channelPlaylists, "Channel playlists retrieved successfully"))
+    .json(new ApiResponse(200, playlist, "Channel playlists retrieved successfully"))
 })
 
 const getPlaylistById = asyncHandler(async (req, res) => {
@@ -165,7 +122,7 @@ const getPlaylistById = asyncHandler(async (req, res) => {
                             fullName: 1, 
                             username: 1, 
                             avatar: 1,
-                            verified: 1, 
+                            verified: 1
                         }
                     }
                 ],
@@ -200,7 +157,8 @@ const getPlaylistById = asyncHandler(async (req, res) => {
                                         _id: 1,
                                         fullName: 1,
                                         username: 1,
-                                        avatar: 1
+                                        avatar: 1,
+                                        verified: 1
                                     }
                                 }
                             ],
