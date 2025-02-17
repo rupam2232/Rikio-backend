@@ -10,6 +10,7 @@ import {
     updatePlaylist,
 } from "../controllers/playlist.controller.js"
 import {verifyJWT} from "../middlewares/auth.middleware.js"
+import { optionalVerifyJWT } from "../middlewares/optionalAuth.middleware.js"
 
 const router = Router();
 
@@ -21,7 +22,7 @@ router.route("/user").get(verifyJWT, getUserPlaylists);
 
 router
     .route("/:playlistId")
-    .get(getPlaylistById)
+    .get(optionalVerifyJWT, getPlaylistById)
     .patch(verifyJWT, updatePlaylist)
     .delete(verifyJWT, deletePlaylist);
 
