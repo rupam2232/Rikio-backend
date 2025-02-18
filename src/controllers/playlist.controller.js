@@ -105,6 +105,8 @@ const getPlaylistById = asyncHandler(async (req, res) => {
 
     const checkIfPrivt = await Playlist.findById(playlistId)
 
+    if(!checkIfPrivt) throw new ApiError(404, "Playlist doesn't exist")
+
     if (!checkIfPrivt?.isPublic) {
         if (checkIfPrivt?.owner.toString() !== req.user?.id) throw new ApiError(400, "You don't have permission to perform this action")
     }
@@ -177,6 +179,16 @@ const getPlaylistById = asyncHandler(async (req, res) => {
                                 ]
                             }
                         }
+                    },
+                    {
+                        $addFields: {
+                            sortIndex: {
+                                $indexOfArray: ["$$videoIds", "$_id"] // Get the index of each video from the original array
+                            }
+                        }
+                    },
+                    {
+                        $sort: { sortIndex: 1 } // Sort videos based on their original order in the playlist
                     },
                     {
                         $lookup: {
