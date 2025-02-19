@@ -1,4 +1,4 @@
-import mongoose from "mongoose"
+import mongoose, { isValidObjectId } from "mongoose"
 import { Playlist } from "../models/playlist.model.js"
 import { Video } from "../models/video.model.js"
 import { ApiError } from "../utils/ApiError.js"
@@ -19,12 +19,67 @@ const createPlaylist = asyncHandler(async (req, res) => {
 
     return res
         .status(201)
-        .json(new ApiResponse(201, createdPlaylist, "Playlist created successfully"))
+        .json(new ApiResponse(201, createdPlaylist, "Playlist created"))
 })
 
 const getUserPlaylists = asyncHandler(async (req, res) => {
 
-    const userPlaylists = await Playlist.find({ owner: req.user?._id })
+    const userPlaylists = await Playlist.aggregate([
+        {
+            $match: {
+                owner: new mongoose.Types.ObjectId(req.user?._id),
+            }
+        },
+        {
+            $lookup: {
+                from: "videos",
+                let: { videoIds: "$videos" },
+                pipeline: [
+                    {
+                        $match: {
+                            $expr: {
+                                $and: [
+                                    { $in: ["$_id", "$$videoIds"] },
+                                    { $eq: ["$isPublished", true] }
+                                ]
+                            }
+                        }
+                    },
+                    {
+                        $project: {
+                            _id: 1,
+                            thumbnail: 1,
+                            views: 1
+                        }
+                    }
+                ],
+                as: "videos"
+            }
+        },
+        {
+            $addFields: {
+                totalVideos: { $size: "$videos" }, // Count the number of videos
+                totalViews: { $sum: "$videos.views" }, // Sum up the views of all videos
+                thumbnail: { $arrayElemAt: ["$videos.thumbnail", 0] } // Get the first video's thumbnail
+            }
+        },
+        {
+            $project: {
+                _id: 1,
+                playlistName: 1,
+                isPublic: 1,
+                createdAt: 1,
+                totalVideos: 1,
+                totalViews: 1,
+                thumbnail: 1
+            }
+        },
+        {
+            $sort: {
+                createdAt: -1
+            }
+        }
+    ]);
 
     return res
         .status(200)
@@ -35,6 +90,8 @@ const getChannelPlaylists = asyncHandler(async (req, res) => {
     const { channelId } = req.params
 
     if (!channelId) throw new ApiError(400, "please give a userId to procced")
+
+    if (!isValidObjectId(channelId)) throw new ApiError(400, "channel id is not valid")
 
     const playlist = await Playlist.aggregate([
         {
@@ -103,9 +160,11 @@ const getPlaylistById = asyncHandler(async (req, res) => {
     const { playlistId } = req.params
     if (!playlistId) throw new ApiError(400, "please give a playlistId")
 
+    if (!isValidObjectId(playlistId)) throw new ApiError(400, "Playlist id is not valid")
+
     const checkIfPrivt = await Playlist.findById(playlistId)
 
-    if(!checkIfPrivt) throw new ApiError(404, "Playlist doesn't exist")
+    if (!checkIfPrivt) throw new ApiError(404, "Playlist doesn't exist")
 
     if (!checkIfPrivt?.isPublic) {
         if (checkIfPrivt?.owner.toString() !== req.user?.id) throw new ApiError(400, "You don't have permission to perform this action")
@@ -346,12 +405,16 @@ const removeVideoFromPlaylist = asyncHandler(async (req, res) => {
 
 const deletePlaylist = asyncHandler(async (req, res) => {
     const { playlistId } = req.params
+
     if (!playlistId) throw new ApiError(400, "please give a playlistId")
+
+    if (!isValidObjectId(playlistId)) throw new ApiError(400, "Playlist id is not valid")
+
     const deletedPlaylist = await Playlist.findOneAndDelete({ _id: playlistId, owner: req.user?._id })
     if (deletedPlaylist) {
         return res
             .status(200)
-            .json(new ApiResponse(200, {}, "Playlist deleted successfully"))
+            .json(new ApiResponse(200, {}, "Playlist deleted"))
     } else {
         throw new ApiError(404, "Playlist not found")
     }
@@ -360,14 +423,18 @@ const deletePlaylist = asyncHandler(async (req, res) => {
 const updatePlaylist = asyncHandler(async (req, res) => {
     const { playlistId } = req.params
     const { playlistName, description, isPublic } = req.body
+
     if (!playlistId) throw new ApiError(400, "please give a playlistId")
+
+    if (!isValidObjectId(playlistId)) throw new ApiError(400, "playlist id is not valid")
+
     if (!playlistName || !(isPublic === true || isPublic === false)) throw new ApiError(400, "a playlist name and isPublic both is required for playlist")
 
     const updatedPlaylist = await Playlist.findOneAndUpdate({ _id: playlistId, owner: req.user?._id }, {
         playlistName,
         isPublic,
         description: description ? description : null
-    },{ new: true})
+    }, { new: true })
 
     if (updatedPlaylist) {
         return res
