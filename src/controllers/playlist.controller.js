@@ -8,7 +8,7 @@ import { asyncHandler } from "../utils/asyncHandler.js"
 
 const createPlaylist = asyncHandler(async (req, res) => {
     const { playlistName, description, isPublic } = req.body
-    if (!playlistName || !isPublic) throw new ApiError(400, "a name and isPublic is required for playlist")
+    if (!playlistName || !(isPublic === true || isPublic === false)) throw new ApiError(400, "a playlist name and isPublic both is required for playlist")
 
     const createdPlaylist = await Playlist.create({
         playlistName,
@@ -359,17 +359,17 @@ const deletePlaylist = asyncHandler(async (req, res) => {
 
 const updatePlaylist = asyncHandler(async (req, res) => {
     const { playlistId } = req.params
-    const { playlistName, description } = req.body
+    const { playlistName, description, isPublic } = req.body
     if (!playlistId) throw new ApiError(400, "please give a playlistId")
-    if (!playlistName) throw new ApiError(400, "please give a playlistName")
+    if (!playlistName || !(isPublic === true || isPublic === false)) throw new ApiError(400, "a playlist name and isPublic both is required for playlist")
 
-    let updatedPlaylist = await Playlist.findOneAndUpdate({ _id: playlistId, owner: req.user?._id }, {
+    const updatedPlaylist = await Playlist.findOneAndUpdate({ _id: playlistId, owner: req.user?._id }, {
         playlistName,
+        isPublic,
         description: description ? description : null
-    })
+    },{ new: true})
 
     if (updatedPlaylist) {
-        updatedPlaylist = await Playlist.findById(playlistId)
         return res
             .status(200)
             .json(new ApiResponse(200, updatedPlaylist, "Playlist updated"))
