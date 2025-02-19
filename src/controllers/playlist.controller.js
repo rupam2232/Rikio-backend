@@ -46,6 +46,16 @@ const getUserPlaylists = asyncHandler(async (req, res) => {
                         }
                     },
                     {
+                        $addFields: {
+                            sortIndex: {
+                                $indexOfArray: ["$$videoIds", "$_id"]
+                            }
+                        }
+                    },
+                    {
+                        $sort: { sortIndex: 1 }
+                    },
+                    {
                         $project: {
                             _id: 1,
                             thumbnail: 1,
@@ -60,7 +70,8 @@ const getUserPlaylists = asyncHandler(async (req, res) => {
             $addFields: {
                 totalVideos: { $size: "$videos" }, // Count the number of videos
                 totalViews: { $sum: "$videos.views" }, // Sum up the views of all videos
-                thumbnail: { $arrayElemAt: ["$videos.thumbnail", 0] } // Get the first video's thumbnail
+                thumbnail: { $arrayElemAt: ["$videos.thumbnail", 0] }, // Get the first video's thumbnail
+                videoIds: "$videos._id"
             }
         },
         {
@@ -71,6 +82,7 @@ const getUserPlaylists = asyncHandler(async (req, res) => {
                 createdAt: 1,
                 totalVideos: 1,
                 totalViews: 1,
+                videoIds: 1,
                 thumbnail: 1
             }
         },
@@ -114,6 +126,16 @@ const getChannelPlaylists = asyncHandler(async (req, res) => {
                                 ]
                             }
                         }
+                    },
+                    {
+                        $addFields: {
+                            sortIndex: {
+                                $indexOfArray: ["$$videoIds", "$_id"]
+                            }
+                        }
+                    },
+                    {
+                        $sort: { sortIndex: 1 }
                     },
                     {
                         $project: {
@@ -365,9 +387,9 @@ const addVideoToPlaylist = asyncHandler(async (req, res) => {
     if (!video) throw new ApiError(404, "video not found")
     if (!video.isPublished) throw new ApiError(404, "Video is not published")
 
-    const isVideoExists = playlist.videos.filter((video) => video._id.toString() === videoId)
+    const isVideoExists = playlist.videos.some((video) => video._id.toString() === videoId)
 
-    if (isVideoExists.length > 0) throw new ApiError(400, "video is already in the playlist")
+    if (isVideoExists) throw new ApiError(400, "video is already in the playlist")
 
     playlist.videos.push(videoId)
 
@@ -375,7 +397,7 @@ const addVideoToPlaylist = asyncHandler(async (req, res) => {
 
     return res
         .status(200)
-        .json(new ApiResponse(200, updatedPlaylist, "Added video to the playlist"))
+        .json(new ApiResponse(200, updatedPlaylist, "Video added to the playlist"))
 
 })
 
