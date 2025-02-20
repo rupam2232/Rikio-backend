@@ -88,15 +88,11 @@ const getUserChannelSubscribers = asyncHandler(async (req, res) => {
 
 // controller to return channel list to which user has subscribed
 const getSubscribedChannels = asyncHandler(async (req, res) => {
-    const { channelId } = req.params
-
-    const channel = await User.findById(channelId)
-    if(!channel) throw new ApiError(400, "Channel not found")
 
     const subscribedChannels = await Subscription.aggregate([
         {
             $match: {
-                subscriber: new mongoose.Types.ObjectId(channel._id)
+                subscriber: new mongoose.Types.ObjectId(req.user?._id)
             }
         },{
             $lookup: {
@@ -113,11 +109,29 @@ const getSubscribedChannels = asyncHandler(async (req, res) => {
                 as: "subscribedChannelInfo",
                 pipeline: [
                     {
+                        $lookup: {
+                            from: "subscriptions",
+                            localField: "_id",
+                            foreignField: "channel",
+                            as: "subscribers"
+                        }
+                    },
+                    {
+                        $addFields: {
+                            subscribers: { $size: "$subscribers" }
+                        }
+                    },
+                    {
                         $project: {
                             _id: 1, 
                             username: 1, 
                             avatar: 1, 
-                            fullName: 1
+                            fullName: 1,
+                            bio: 1,
+                            verified: 1,
+                            subscribers: 1,
+                            createdAt: 1
+
                         }
                     }
                 ]
@@ -132,7 +146,10 @@ const getSubscribedChannels = asyncHandler(async (req, res) => {
                 user: {"$first":{
                     _id: "$subscriberDetails._id",
                     name: "$subscriberDetails.fullName",
-                    username: "$subscriberDetails.username"
+                    username: "$subscriberDetails.username",
+                    // bio: "$subscriberDetails.bio",
+                    // createdAt: "$subscriberDetails.createdAt",
+                    // avatar: "$subscriberDetails.avatar",
                 }},
                 subscribed: { $push: "$subscribedChannelInfo" }
             }
