@@ -8,6 +8,7 @@ import { ApiResponse } from "../utils/ApiResponse.js"
 import jwt from "jsonwebtoken"
 import mongoose, { isValidObjectId } from "mongoose"
 import fs from "fs"
+import { watchHistory } from "../models/watchHistory.model.js"
 
 const generateAccessAndRefreshTokens = async (userId) => {
     try {
@@ -477,25 +478,50 @@ const getWatchHistory = asyncHandler(async (req, res) => {
 })
 
 const pushVideoToWatchHistory = asyncHandler(async (req, res) => {
-    const { videoId } = req.params
+    const { videoId, userTimeZoneOffset } = req.body
     if (!isValidObjectId(videoId)) throw new ApiError(400, "video id is not a valid object id")
+
+    if (!userTimeZoneOffset) throw new ApiError(400, "userTimeZoneOffset required")
 
     const isVideoAvl = await Video.findOne({ _id: videoId, isPublished: true })
 
     if (!isVideoAvl) throw new ApiError(400, "video not found")
 
-    const user = await User.findByIdAndUpdate(req.user?._id, {
-        $push: { watchHistory: isVideoAvl._id },
-    }, {
-        new: true,
-        validateBeforeSave: false
-    }).select("watchHistory _id username")
 
-    if (!user) throw new ApiError(400, "User not found")
+    const nowUTC = new Date();
+
+    // Convert UTC time to user's local date using offset (in minutes)
+    const userNow = new Date(nowUTC.getTime() + userTimeZoneOffset * 60000);
+
+    // Get user's local day boundaries
+    const userStartOfDay = new Date(userNow);
+    userStartOfDay.setUTCHours(0, 0, 0, 0); // Start of the user's local day in UTC context
+
+    const userEndOfDay = new Date(userStartOfDay);
+    userEndOfDay.setUTCDate(userEndOfDay.getUTCDate() + 1); // Next day start (exclusive)
+
+    // Convert back to absolute UTC time for database query
+    const utcStartOfDay = new Date(userStartOfDay.getTime() - userTimeZoneOffset * 60000);
+    const utcEndOfDay = new Date(userEndOfDay.getTime() - userTimeZoneOffset * 60000);
+
+    // Delete documents matching uniqueId and within the same local day
+    await watchHistory.deleteMany({
+        videoId,
+        watchedBy: req.user._id,
+        createdAt: { $gte: utcStartOfDay, $lt: utcEndOfDay }
+    });
+
+    // Insert a new document with the current UTC timestamp
+    const addedVideo = await watchHistory.create({
+        videoId,
+        watchedBy: req.user._id,
+    });
+
+    if (!addedVideo) throw new ApiError(400, "Can't add video to watch history")
 
     return res
         .status(200)
-        .json(new ApiResponse(200, user, "Video added to watchHistory successfully"))
+        .json(new ApiResponse(200, addedVideo, "Video added to watchHistory successfully"))
 })
 
 const checkIfUsernameIsAvl = asyncHandler(async (req, res) => {
@@ -544,7 +570,7 @@ const addSocials = asyncHandler(async (req, res) => {
             website: website ? website : null,
             x: x ? x : null
         })
-    }else{
+    } else {
         socials.facebook = facebook ? facebook : null
         socials.instagram = instagram ? instagram : null
         socials.linkedin = linkedin ? linkedin : null

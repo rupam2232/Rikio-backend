@@ -45,7 +45,7 @@ router.route("/c/:username").get(optionalVerifyJWT , getUserChannelProfile)
 
 router.route("/history").get(verifyJWT, getWatchHistory)
 
-router.route("/add-history/:videoId").post(verifyJWT, pushVideoToWatchHistory)
+router.route("/add-history").post(verifyJWT, pushVideoToWatchHistory)
 
 router.route("/check-username/:username").get(optionalVerifyJWT, checkIfUsernameIsAvl)
 
