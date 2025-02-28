@@ -380,102 +380,127 @@ const getUserChannelProfile = asyncHandler(async (req, res) => {
 })
 
 const getWatchHistory = asyncHandler(async (req, res) => {
+    const { page = 1, limit = 10 } = req.query;
+    const userId = req.user._id;
 
-    const findUser = await User.findById(req.user._id)
-    if (!findUser) throw new ApiError(404, "User does not exists")
-
-    const page = parseInt(req.query.page, 10) || 1;
-    const limit = parseInt(req.query.limit, 10) || 10;
-    if (page < 1 || limit < 1) {
-        return res
-            .status(400)
-            .json(new ApiResponse(400, 'Page and limit must be positive integers'));
-    }
-    const skip = (page - 1) * limit;
-
-    const user = await User.aggregate([
+    const historyAggregation  = await watchHistory.aggregate([
         {
-            $match: {
-                _id: new mongoose.Types.ObjectId(req.user._id)
-            }
-        }, {
-            $project: {
-                watchHistory: { $reverseArray: "$watchHistory" }, // Reverse the array to get the desired order
-            },
-        }, {
-            $unwind: "$watchHistory"
-        }, {
+            $match: { watchedBy: new mongoose.Types.ObjectId(userId) }
+        },
+        {
             $lookup: {
                 from: "videos",
-                localField: "watchHistory",
+                localField: "videoId",
                 foreignField: "_id",
-                as: "watchHistory",
+                as: "video",
                 pipeline: [
-                    {
-                        $match: { isPublished: true }
-                    }, {
-                        $sort: { createdAt: -1 }
-                    },
+                    { $match: { isPublished: true } }, // ✅ Only include published videos
                     {
                         $lookup: {
                             from: "users",
                             localField: "owner",
                             foreignField: "_id",
-                            as: "owner",
-                            pipeline: [
-                                {
-                                    $project: {
-                                        _id: 1,
-                                        fullName: 1,
-                                        username: 1,
-                                        avatar: 1,
-                                        verified: 1
-                                    }
-                                }
-                            ]
+                            as: "ownerDetails"
+                        }
+                    },
+                    { $unwind: "$ownerDetails" },
+                    {
+                        $lookup: {
+                            from: "subscriptions",
+                            localField: "owner",
+                            foreignField: "channel",
+                            as: "subscribers"
                         }
                     },
                     {
                         $addFields: {
-                            owner: {
-                                $first: "$owner"
+                            "ownerDetails.subscribers": { $size: "$subscribers" },
+                            "ownerDetails.isSubscribed": {
+                                $in: [new mongoose.Types.ObjectId(userId), "$subscribers.subscriber"]
                             }
                         }
-                    }, {
+                    },
+                    {
                         $project: {
                             _id: 1,
-                            thumbnail: 1,
                             title: 1,
+                            thumbnail: 1,
                             duration: 1,
-                            views: 1,
-                            isPublished: 1,
-                            owner: 1
+                            createdAt: 1,
+                            owner: {
+                                _id: "$ownerDetails._id",
+                                username: "$ownerDetails.username",
+                                fullName: "$ownerDetails.fullName",
+                                avatar: "$ownerDetails.avatar",
+                                verified: "$ownerDetails.verified",
+                                bio: "$ownerDetails.bio",
+                                createdAt: "$ownerDetails.createdAt",
+                                subscribers: "$ownerDetails.subscribers",
+                                isSubscribed: "$ownerDetails.isSubscribed"
+                            }
                         }
                     }
                 ]
             }
-        }, {
-            $unwind: "$watchHistory"
-        }, {
-            $replaceRoot: { newRoot: "$watchHistory" }, // Replace root with video documents
-        }, {
-            $skip: skip,
-        }, {
-            $limit: limit,
-        }, {
+        },
+        { $unwind: "$video" }, // Flatten the video array
+        {
             $group: {
-                _id: null,
-                watchHistory: { $push: "$$ROOT" }
+                _id: {
+                    year: { $year: "$createdAt" },
+                    month: { $month: "$createdAt" },
+                    day: { $dayOfMonth: "$createdAt" }
+                },
+                createdAt: { $first: "$createdAt" },
+                videos: { $push: "$video" }
             }
-        }
-    ])
+        },
+        { $sort: { _id: -1 } }, // ✅ Sort by latest date
+        { $skip: (page - 1) * limit },
+        { $limit: Number(limit) }
+    ]);
 
-    return res
-        .status(200)
-        .json(
-            new ApiResponse(200, user[0]?.watchHistory || [], "Watch history fetched successfully")
-        )
-})
+    // ✅ Correcting Total Video Count (Only Published Videos)
+    const totalCount = await watchHistory.aggregate([
+        {
+            $lookup: {
+                from: "videos",
+                localField: "videoId",
+                foreignField: "_id",
+                as: "video",
+                pipeline: [{ $match: { isPublished: true } }] // ✅ Only count published videos
+            }
+        },
+        { $unwind: "$video" },
+        {
+            $group: {
+                _id: {
+                    year: { $year: "$createdAt" },
+                    month: { $month: "$createdAt" },
+                    day: { $dayOfMonth: "$createdAt" }
+                }
+            }
+        },
+        { $count: "total" }
+    ]);
+
+    const totalPages = Math.ceil((totalCount[0]?.total || 0) / limit);
+
+    return res.status(200).json(new ApiResponse(200, {
+        history: historyAggregation,
+        totalVideos: totalCount[0]?.total || 0,
+        currentPage: parseInt(page),
+        totalPages
+    }, "User's watch history fetched successfully"));
+
+    return res.status(200).json({
+        history: historyAggregation , // ✅ Keeps your previous response format
+        totalPages,
+        currentPage: Number(page),
+        totalVideo: totalCount[0]?.total || 0 // ✅ Correct total count (excluding unpublished videos)
+    });
+});
+
 
 const pushVideoToWatchHistory = asyncHandler(async (req, res) => {
     const { videoId, userTimeZoneOffset } = req.body
