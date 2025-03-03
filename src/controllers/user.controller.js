@@ -394,7 +394,7 @@ const getWatchHistory = asyncHandler(async (req, res) => {
                 foreignField: "_id",
                 as: "video",
                 pipeline: [
-                    { $match: { isPublished: true } }, // ✅ Only include published videos
+                    { $match: { isPublished: true } },
                     {
                         $lookup: {
                             from: "users",
@@ -443,7 +443,10 @@ const getWatchHistory = asyncHandler(async (req, res) => {
                 ]
             }
         },
-        { $unwind: "$video" }, // Flatten the video array
+        { $unwind: "$video" },
+        { $sort: { createdAt: -1 } },
+        { $skip: (page - 1) * limit },
+        { $limit: Number(limit) },
         {
             $group: {
                 _id: {
@@ -455,32 +458,24 @@ const getWatchHistory = asyncHandler(async (req, res) => {
                 videos: { $push: "$video" }
             }
         },
-        { $sort: { _id: -1 } }, // ✅ Sort by latest date
-        { $skip: (page - 1) * limit },
-        { $limit: Number(limit) }
+        { $sort: { _id: -1 } }
     ]);
 
-    // ✅ Correcting Total Video Count (Only Published Videos)
+    
     const totalCount = await watchHistory.aggregate([
+        {
+            $match: { watchedBy: new mongoose.Types.ObjectId(userId) }
+        },
         {
             $lookup: {
                 from: "videos",
                 localField: "videoId",
                 foreignField: "_id",
                 as: "video",
-                pipeline: [{ $match: { isPublished: true } }] // ✅ Only count published videos
+                pipeline: [{ $match: { isPublished: true } }]
             }
         },
         { $unwind: "$video" },
-        {
-            $group: {
-                _id: {
-                    year: { $year: "$createdAt" },
-                    month: { $month: "$createdAt" },
-                    day: { $dayOfMonth: "$createdAt" }
-                }
-            }
-        },
         { $count: "total" }
     ]);
 
@@ -492,13 +487,6 @@ const getWatchHistory = asyncHandler(async (req, res) => {
         currentPage: parseInt(page),
         totalPages
     }, "User's watch history fetched successfully"));
-
-    return res.status(200).json({
-        history: historyAggregation , // ✅ Keeps your previous response format
-        totalPages,
-        currentPage: Number(page),
-        totalVideo: totalCount[0]?.total || 0 // ✅ Correct total count (excluding unpublished videos)
-    });
 });
 
 
