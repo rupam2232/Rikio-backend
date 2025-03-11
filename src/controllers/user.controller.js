@@ -427,6 +427,8 @@ const getWatchHistory = asyncHandler(async (req, res) => {
                             thumbnail: 1,
                             duration: 1,
                             createdAt: 1,
+                            views: 1,
+                            isPublished: 1,
                             owner: {
                                 _id: "$ownerDetails._id",
                                 username: "$ownerDetails.username",
@@ -489,7 +491,6 @@ const getWatchHistory = asyncHandler(async (req, res) => {
     }, "User's watch history fetched successfully"));
 });
 
-
 const pushVideoToWatchHistory = asyncHandler(async (req, res) => {
     const { videoId, userTimeZoneOffset } = req.body
     if (!isValidObjectId(videoId)) throw new ApiError(400, "video id is not a valid object id")
@@ -531,6 +532,8 @@ const pushVideoToWatchHistory = asyncHandler(async (req, res) => {
     });
 
     if (!addedVideo) throw new ApiError(400, "Can't add video to watch history")
+
+    await Video.findByIdAndUpdate(videoId, { $inc: { views: 1 } });
 
     return res
         .status(200)
