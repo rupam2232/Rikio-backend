@@ -214,16 +214,16 @@ const getCurrentUser = asyncHandler(async (req, res) => {
 })
 
 const updateAccountDetails = asyncHandler(async (req, res) => {
-    const { fullName, email } = req.body
+    const { fullName, bio } = req.body
 
-    if (!fullName || !email) throw new ApiError(400, "All fields are required")
+    if (!fullName.trim()) throw new ApiError(400, "Fullname is required")
 
     const user = await User.findByIdAndUpdate(
         req.user?._id,
         {
             $set: {
-                fullName,
-                email
+                fullName: fullName.trim(),
+                bio: bio ? bio.trim() : null
             }
         },
         { new: true }
@@ -237,7 +237,16 @@ const updateAccountDetails = asyncHandler(async (req, res) => {
 const updateUserAvatar = asyncHandler(async (req, res) => {
     const avatarLocalPath = req.file?.path
 
-    if (!avatarLocalPath) throw new ApiError(400, "Avatar file is missing")
+    if (!avatarLocalPath) {
+        const user = await User.findById(req.user?.id)
+        if (user?.avatar) await cloudinary.deleteImage(user.avatar)
+        user.avatar = null;
+        await User.save();
+        return res
+            .status(200)
+            .json(new ApiResponse(200, user, "Avatar updated successfully"))
+    }
+
     if (!req.file.mimetype.includes("image")) {
         fs.unlinkSync(req.file.path)
         throw new ApiError(400, "Only images are allowed to upload")
@@ -248,7 +257,7 @@ const updateUserAvatar = asyncHandler(async (req, res) => {
     if (!avatar.secure_url) throw new ApiError(500, "Error while uploading avatar")
 
     const oldUser = await User.findById(req.user?.id)
-    await cloudinary.deleteImage(oldUser.avatar)
+    if (oldUser?.avatar) await cloudinary.deleteImage(oldUser.avatar)
 
     const user = await User.findByIdAndUpdate(
         req.user?._id,
@@ -270,7 +279,15 @@ const updateUserAvatar = asyncHandler(async (req, res) => {
 const updateUserCoverImage = asyncHandler(async (req, res) => {
     const coverImageLocalPath = req.file?.path
 
-    if (!coverImageLocalPath) throw new ApiError(400, "Cover file is missing")
+    if (!coverImageLocalPath) {
+        const user = await User.findById(req.user?.id)
+        if (user?.coverImage) await cloudinary.deleteImage(user.coverImage)
+        user.coverImage = null;
+        await User.save();
+        return res
+            .status(200)
+            .json(new ApiResponse(200, user, "coverImage updated successfully"))
+    }
     if (req.file.mimetype.includes("gif") || !req.file.mimetype.includes("image")) {
         fs.unlinkSync(req.file.path)
         throw new ApiError(400, "Only images are allowed to upload")
@@ -383,7 +400,7 @@ const getWatchHistory = asyncHandler(async (req, res) => {
     const { page = 1, limit = 10 } = req.query;
     const userId = req.user._id;
 
-    const historyAggregation  = await watchHistory.aggregate([
+    const historyAggregation = await watchHistory.aggregate([
         {
             $match: { watchedBy: new mongoose.Types.ObjectId(userId) }
         },
@@ -463,7 +480,7 @@ const getWatchHistory = asyncHandler(async (req, res) => {
         { $sort: { _id: -1 } }
     ]);
 
-    
+
     const totalCount = await watchHistory.aggregate([
         {
             $match: { watchedBy: new mongoose.Types.ObjectId(userId) }
