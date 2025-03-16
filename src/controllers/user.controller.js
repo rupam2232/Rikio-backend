@@ -241,10 +241,10 @@ const updateUserAvatar = asyncHandler(async (req, res) => {
         const user = await User.findById(req.user?.id)
         if (user?.avatar) await cloudinary.deleteImage(user.avatar)
         user.avatar = null;
-        await User.save();
+        await user.save();
         return res
             .status(200)
-            .json(new ApiResponse(200, user, "Avatar updated successfully"))
+            .json(new ApiResponse(200, {avatar: user.avatar}, "Avatar updated successfully"))
     }
 
     if (!req.file.mimetype.includes("image")) {
@@ -283,10 +283,10 @@ const updateUserCoverImage = asyncHandler(async (req, res) => {
         const user = await User.findById(req.user?.id)
         if (user?.coverImage) await cloudinary.deleteImage(user.coverImage)
         user.coverImage = null;
-        await User.save();
+        await user.save();
         return res
             .status(200)
-            .json(new ApiResponse(200, user, "coverImage updated successfully"))
+            .json(new ApiResponse(200, {coverImage: user.coverImage}, "coverImage updated successfully"))
     }
     if (req.file.mimetype.includes("gif") || !req.file.mimetype.includes("image")) {
         fs.unlinkSync(req.file.path)
@@ -596,20 +596,20 @@ const addSocials = asyncHandler(async (req, res) => {
     if (!socials) {
         socials = new Social({
             user: req.user._id,
-            facebook: facebook ? facebook : null,
-            instagram: instagram ? instagram : null,
-            linkedin: linkedin ? linkedin : null,
-            github: github ? github : null,
-            website: website ? website : null,
-            x: x ? x : null
+            facebook: facebook ? facebook.trim() : null,
+            instagram: instagram ? instagram.trim() : null,
+            linkedin: linkedin ? linkedin.trim() : null,
+            github: github ? github.trim() : null,
+            website: website ? website.trim() : null,
+            x: x ? x.trim() : null
         })
     } else {
-        socials.facebook = facebook ? facebook : null
-        socials.instagram = instagram ? instagram : null
-        socials.linkedin = linkedin ? linkedin : null
-        socials.github = github ? github : null
-        socials.website = website ? website : null
-        socials.x = x ? x : null
+        socials.facebook = facebook ? facebook.trim() : null
+        socials.instagram = instagram ? instagram.trim() : null
+        socials.linkedin = linkedin ? linkedin.trim() : null
+        socials.github = github ? github.trim() : null
+        socials.website = website ? website.trim() : null
+        socials.x = x ? x.trim() : null
     }
     await socials.save()
 
