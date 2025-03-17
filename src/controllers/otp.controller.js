@@ -79,7 +79,7 @@ const sendOtp = asyncHandler(async (req, res) => {
 })
 
 const verifyOtp = asyncHandler(async (req, res) => {
-    const { email, otp } = req.body;
+    const { email, otp, context } = req.body;
     if (!email || !otp) {
         throw new ApiError(400, "Email and otp is required");
     }
@@ -94,6 +94,12 @@ const verifyOtp = asyncHandler(async (req, res) => {
         return res
             .status(200)
             .json(new ApiResponse(400, false, "Otp is expired"));
+    }
+
+    if(otpData.context !== context){
+        return res
+        .status(200)
+        .json(new ApiResponse(400, false, "Invalid Otp"))
     }
 
     const isOtpCorrect = await otpData.isOtpCorrect(otp);

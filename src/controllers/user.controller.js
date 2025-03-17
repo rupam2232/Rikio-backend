@@ -48,11 +48,11 @@ const registerUser = asyncHandler(async (req, res) => {
 
     if (req.verifyOtp !== true) throw new ApiError(400, "Invalid otp")
 
-    const existedUser = await User.findOne({
+    const isUserExist = await User.findOne({
         $or: [{ username }, { email }]
     })
 
-    if (existedUser) {
+    if (isUserExist) {
         throw new ApiError(409, "User with email or username already exists")
     }
 
@@ -213,7 +213,7 @@ const getCurrentUser = asyncHandler(async (req, res) => {
         .json(new ApiResponse(200, req.user, "current user fetched successfully"))
 })
 
-const updateAccountDetails = asyncHandler(async (req, res) => {
+const updateProfileDetails = asyncHandler(async (req, res) => {
     const { fullName, bio } = req.body
 
     if (!fullName.trim()) throw new ApiError(400, "Fullname is required")
@@ -231,7 +231,39 @@ const updateAccountDetails = asyncHandler(async (req, res) => {
 
     return res
         .status(200)
-        .json(new ApiResponse(200, user, "Account details updated successfully"))
+        .json(new ApiResponse(200, user, "Profile details updated successfully"))
+})
+
+const updateAccountDetails = asyncHandler(async (req, res) => {
+    const { username, email, password } = req.body
+
+    if (!username.trim() || !email.trim() || password.trim()) throw new ApiError(400, "All fields are required")
+
+    const user = await User.findById(req.user?._id)
+
+    if (!user) throw new ApiError(404, "User not found")
+
+    const isPasswordValid = await user.isPasswordCorrect(password)
+
+    if (!isPasswordValid) throw new ApiError(404, "Invalid password")
+
+    if (username !== req.user.username) {
+        const isUserExist = await User.findOne({ username })
+        if (isUserExist) throw new ApiError(400, "User with same username already exists")
+        user.username = username;
+        await user.save();
+    }
+
+    if (email !== req.user.email) {
+        const isUserExist = await User.findOne({ email })
+        if (isUserExist) throw new ApiError(400, "User with same email already exists")
+        user.email = email;
+        await user.save();
+    }
+
+    return res
+        .status(200)
+        .json(new ApiResponse(200, {_id: user._id, username: user.username, emali: user.email}, "Account details updated successfully"))
 })
 
 const updateUserAvatar = asyncHandler(async (req, res) => {
@@ -244,7 +276,7 @@ const updateUserAvatar = asyncHandler(async (req, res) => {
         await user.save();
         return res
             .status(200)
-            .json(new ApiResponse(200, {avatar: user.avatar}, "Avatar updated successfully"))
+            .json(new ApiResponse(200, { avatar: user.avatar }, "Avatar updated successfully"))
     }
 
     if (!req.file.mimetype.includes("image")) {
@@ -286,7 +318,7 @@ const updateUserCoverImage = asyncHandler(async (req, res) => {
         await user.save();
         return res
             .status(200)
-            .json(new ApiResponse(200, {coverImage: user.coverImage}, "coverImage updated successfully"))
+            .json(new ApiResponse(200, { coverImage: user.coverImage }, "coverImage updated successfully"))
     }
     if (req.file.mimetype.includes("gif") || !req.file.mimetype.includes("image")) {
         fs.unlinkSync(req.file.path)
@@ -625,6 +657,7 @@ export {
     refreshAccessToken,
     changeCurrentPassword,
     getCurrentUser,
+    updateProfileDetails,
     updateAccountDetails,
     updateUserAvatar,
     updateUserCoverImage,

@@ -2,7 +2,7 @@ import { Otp } from "../models/otp.model.js";
 import { asyncHandler } from "../utils/asyncHandler.js"
 import { ApiError } from "../utils/ApiError.js"
 
-const verifyOtp = asyncHandler(async (req, res, next) => {
+const verifyOtp = asyncHandler(async (req, _, next) => {
     const { email, otp } = req.body;
     if (!email || !otp) {
         throw new ApiError(400, "Email and otp is required");
