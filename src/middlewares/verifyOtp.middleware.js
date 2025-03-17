@@ -28,7 +28,6 @@ const verifyOtp = asyncHandler(async (req, _, next) => {
         throw new ApiError(404, "Invalid otp");
     }
     
-    // req.otpContext = isOtpCorrect.context
     await Otp.deleteOne({email: otpData.email});
     req.verifyOtp = true;
     

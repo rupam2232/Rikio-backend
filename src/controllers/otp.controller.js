@@ -91,26 +91,20 @@ const verifyOtp = asyncHandler(async (req, res) => {
     }
 
     if (otpData.expires < new Date()) {
-        return res
-            .status(200)
-            .json(new ApiResponse(400, false, "Otp is expired"));
+        throw new ApiError(400, "Otp is expired");
     }
 
     if(otpData.context !== context){
-        return res
-        .status(200)
-        .json(new ApiResponse(400, false, "Invalid Otp"))
+        throw new ApiError(400, "Invalid Otp")
     }
 
     const isOtpCorrect = await otpData.isOtpCorrect(otp);
 
     if (!isOtpCorrect) {
-        return res
-            .status(200)
-            .json(new ApiResponse(400, false, "Otp is incorrect"));
+        throw new ApiError(400, "Otp is incorrect");
     }
 
-    // await Otp.deleteOne({email: otpData.email});
+    await Otp.deleteOne({email: otpData.email});
 
     return res
         .status(200)

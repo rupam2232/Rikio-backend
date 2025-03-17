@@ -235,9 +235,11 @@ const updateProfileDetails = asyncHandler(async (req, res) => {
 })
 
 const updateAccountDetails = asyncHandler(async (req, res) => {
-    const { username, email, password } = req.body
+    const { username, email, password, isOtpValid } = req.body
+    
+    if (!username.trim() || !email.trim() || !password.trim()) throw new ApiError(400, "All fields are required")
 
-    if (!username.trim() || !email.trim() || password.trim()) throw new ApiError(400, "All fields are required")
+    if ((email !== req.user.email) && !isOtpValid) throw new ApiError(400, "Please verify your email")
 
     const user = await User.findById(req.user?._id)
 
@@ -263,7 +265,7 @@ const updateAccountDetails = asyncHandler(async (req, res) => {
 
     return res
         .status(200)
-        .json(new ApiResponse(200, {_id: user._id, username: user.username, emali: user.email}, "Account details updated successfully"))
+        .json(new ApiResponse(200, { _id: user._id, username: user.username, emali: user.email }, "Account details updated successfully"))
 })
 
 const updateUserAvatar = asyncHandler(async (req, res) => {
