@@ -10,6 +10,7 @@ const allowedOrigins = process.env.CORS_ORIGIN.split(',').map(origin => origin.t
 app.use(cors({
     origin: function (origin, callback) {
         if (!origin && isDev) return callback(null, true);
+        if (!origin) return callback(null, false);
         if (allowedOrigins.includes(origin)) {
           return callback(null, true);
         } else {
