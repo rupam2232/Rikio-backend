@@ -5,7 +5,7 @@ import cookieParser from "cookie-parser";
 const app = express();
 
 const isDev = process.env.NODE_ENV === 'development';
-const allowedOrigins = process.env.CORS_ORIGIN.split(',');
+const allowedOrigins = process.env.CORS_ORIGIN.split(',').map(origin => origin.trim());;
 
 app.use(cors({
     origin: function (origin, callback) {
