@@ -4,8 +4,18 @@ import cookieParser from "cookie-parser";
 
 const app = express();
 
+const isDev = process.env.NODE_ENV === 'development';
+const allowedOrigins = process.env.CORS_ORIGIN.split(',');
+
 app.use(cors({
-    origin: process.env.CORS_ORIGIN,
+    origin: function (origin, callback) {
+        if (!origin && isDev) return callback(null, true);
+        if (allowedOrigins.includes(origin)) {
+          return callback(null, true);
+        } else {
+          return callback(new Error('CORS policy: Not allowed by CORS'));
+        }
+      },
     credentials: true
 }))
 
