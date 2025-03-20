@@ -9,6 +9,8 @@ import jwt from "jsonwebtoken"
 import mongoose, { isValidObjectId } from "mongoose"
 import fs from "fs"
 import { watchHistory } from "../models/watchHistory.model.js"
+import { EMAIL_RESET_SUCCESS_TEMPLATE } from "../utils/emailTemplates.js"
+import sendEmail from "../utils/sendEmail.js"
 
 const generateAccessAndRefreshTokens = async (userId) => {
     try {
@@ -236,7 +238,7 @@ const updateProfileDetails = asyncHandler(async (req, res) => {
 
 const updateAccountDetails = asyncHandler(async (req, res) => {
     const { username, email, password, isOtpValid } = req.body
-    
+
     if (!username.trim() || !email.trim() || !password.trim()) throw new ApiError(400, "All fields are required")
 
     if ((email !== req.user.email) && !isOtpValid) throw new ApiError(400, "Please verify your email")
@@ -261,6 +263,22 @@ const updateAccountDetails = asyncHandler(async (req, res) => {
         if (isUserExist) throw new ApiError(400, "User with same email already exists")
         user.email = email;
         await user.save();
+
+        function maskEmail(email) {
+            const [localPart, domain] = email.split('@');
+            const maskedLocal = localPart[0] + localPart[1] + '*'.repeat(localPart.length - 2);
+            
+            return `${maskedLocal}@${domain}`;
+          }
+
+        const mailOptions = {
+            to: req.user.email,
+            subject: "Email reset successful",
+            html: EMAIL_RESET_SUCCESS_TEMPLATE.replace("{email}", maskEmail(email)).replace("{name}", user.fullName),
+            headers: { 'X-Email-Category': 'Email Reset' }
+        }
+
+        await sendEmail.send(mailOptions);
     }
 
     return res
