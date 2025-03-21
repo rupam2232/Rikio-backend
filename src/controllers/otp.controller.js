@@ -6,7 +6,6 @@ import { ApiResponse } from "../utils/ApiResponse.js"
 import sendEmail from "../utils/sendEmail.js"
 import {
     PASSWORD_RESET_REQUEST_TEMPLATE,
-    PASSWORD_RESET_SUCCESS_TEMPLATE,
     VERIFICATION_EMAIL_TEMPLATE,
 } from "../utils/emailTemplates.js";
 

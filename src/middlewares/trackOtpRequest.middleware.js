@@ -19,7 +19,27 @@ const trackOtpRequest = asyncHandler(async (req, _, next) => {
 
     if (requestRecord) {
         if (requestRecord.requestCount >= MAX_REQUESTS_PER_DAY) {
-            throw new ApiError(429, `You have reached the limit of ${MAX_REQUESTS_PER_DAY} OTP requests today. Try again after 24 hours.`)
+
+            function timeUntil24HoursLater() {
+                const twentyFourHoursLater = new Date(requestRecord.firstRequestTime.getTime() + 24 * 60 * 60 * 1000);
+                const timeDifferenceMs = twentyFourHoursLater.getTime() - now.getTime();
+              
+                if (timeDifferenceMs <= 0) {
+                  return "The target time has already passed.";
+                }
+              
+                const timeDifferenceSeconds = Math.floor(timeDifferenceMs / 1000);
+                const timeDifferenceMinutes = Math.floor(timeDifferenceSeconds / 60);
+                const timeDifferenceHours = Math.floor(timeDifferenceMinutes / 60);
+              
+                if (timeDifferenceHours > 0) {
+                  return `${timeDifferenceHours} hours.`;
+                } else {
+                  return `${timeDifferenceMinutes} minutes.`;
+                }
+              }
+              
+            throw new ApiError(429, `You have reached the limit of ${MAX_REQUESTS_PER_DAY} OTP requests today. Try again after ${timeUntil24HoursLater()}`);
         } else {
             requestRecord.requestCount += 1;
             await requestRecord.save();

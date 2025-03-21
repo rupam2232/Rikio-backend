@@ -11,7 +11,7 @@ const verifyOtp = asyncHandler(async (req, _, next) => {
     const otpData = await Otp.findOne({ email });
 
     if (!otpData) {
-        throw new ApiError(404, "Otp not found");
+        throw new ApiError(404, "Otp not found. Please resend a new one");
     }
 
     if (otpData.expires < new Date()) {
@@ -30,7 +30,7 @@ const verifyOtp = asyncHandler(async (req, _, next) => {
     
     await Otp.deleteOne({email: otpData.email});
     req.verifyOtp = true;
-    
+
     next();
 })
 

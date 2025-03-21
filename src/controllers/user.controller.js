@@ -9,7 +9,7 @@ import jwt from "jsonwebtoken"
 import mongoose, { isValidObjectId } from "mongoose"
 import fs from "fs"
 import { watchHistory } from "../models/watchHistory.model.js"
-import { EMAIL_RESET_SUCCESS_TEMPLATE } from "../utils/emailTemplates.js"
+import { EMAIL_RESET_SUCCESS_TEMPLATE, PASSWORD_RESET_SUCCESS_TEMPLATE } from "../utils/emailTemplates.js"
 import sendEmail from "../utils/sendEmail.js"
 
 const generateAccessAndRefreshTokens = async (userId) => {
@@ -204,6 +204,15 @@ const changeCurrentPassword = asyncHandler(async (req, res) => {
     user.password = newPassword
     await user.save({ validateBeforeSave: false })
 
+    const mailOptions = {
+        to: user.email,
+        subject: "Password reset successful",
+        html: PASSWORD_RESET_SUCCESS_TEMPLATE.replace("{name}", user.fullName),
+        headers: { 'X-Email-Category': 'Password Reset' }
+    }
+
+    await sendEmail.send(mailOptions);
+
     return res
         .status(200)
         .json(new ApiResponse(200, {}, "Password changed successfully"))
@@ -267,9 +276,9 @@ const updateAccountDetails = asyncHandler(async (req, res) => {
         function maskEmail(email) {
             const [localPart, domain] = email.split('@');
             const maskedLocal = localPart[0] + localPart[1] + '*'.repeat(localPart.length - 2);
-            
+
             return `${maskedLocal}@${domain}`;
-          }
+        }
 
         const mailOptions = {
             to: req.user.email,
