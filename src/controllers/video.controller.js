@@ -422,7 +422,7 @@ const getAllVideos = asyncHandler(async (req, res) => {
                     views: 1,
                     thumbnail: 1,
                     tags: 1,
-                    isSubscribed: 1,
+                    createdAt: 1,
                     owner: {
                         _id: "$ownerDetails._id",
                         username: "$ownerDetails.username",
@@ -431,6 +431,7 @@ const getAllVideos = asyncHandler(async (req, res) => {
                         verified: "$ownerDetails.verified",
                         bio: "$ownerDetails.bio",
                         createdAt: "$ownerDetails.createdAt",
+                        isSubscribed: "$isSubscribed",
                         subscribers: { $size: "$subscribers" }
                     }
                 }
@@ -505,7 +506,7 @@ const getAllVideos = asyncHandler(async (req, res) => {
         const videos = await Video.aggregate([
             { $match: { owner: user._id, isPublished: true } },
             { $sort: { [sortBy]: sortType === 'asc' ? 1 : -1 } },
-            { $limit: 3 },
+            { $limit: 1 },
             {
                 $lookup: {
                     from: "users",
@@ -542,7 +543,6 @@ const getAllVideos = asyncHandler(async (req, res) => {
                     thumbnail: 1,
                     createdAt: 1,
                     views: 1,
-                    isSubscribed: 1,
                     tags: 1,
                     owner: {
                         __id: "$ownerDetails._id",
@@ -552,6 +552,7 @@ const getAllVideos = asyncHandler(async (req, res) => {
                         verified: "$ownerDetails.verified",
                         bio: "$ownerDetails.bio",
                         subscribers: { $size: "$subscribers" },
+                        isSubscribed: "$isSubscribed",
                         createdAt: "$ownerDetails.createdAt"
                     }
                 }
@@ -588,7 +589,7 @@ const getAllVideos = asyncHandler(async (req, res) => {
                 currentPage: pageNumber,
                 totalPages: Math.ceil((totalContent) / limitNumber)
             },
-            decodedSearch ? "Search results" : "Homepage videos"
+            decodedSearch ? `Search results for "${decodedSearch}"` : "Homepage videos"
         )
     );
 });
