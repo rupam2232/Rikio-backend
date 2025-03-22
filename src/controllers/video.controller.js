@@ -516,7 +516,7 @@ const getAllVideos = asyncHandler(async (req, res) => {
             },
             {
                 $unwind: "$ownerDetails"
-            }, , {
+            }, {
                 $lookup: {
                     from: "subscriptions",
                     localField: "owner",
