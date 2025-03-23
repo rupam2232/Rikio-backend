@@ -562,7 +562,7 @@ const getAllVideos = asyncHandler(async (req, res) => {
         totalContent += parseInt(videos.length)
         channelVideos.push({
             channel: user,
-            videos
+            video: videos[0]
         });
     }
 
