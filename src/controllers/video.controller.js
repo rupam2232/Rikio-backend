@@ -292,6 +292,7 @@ const getAllVideos = asyncHandler(async (req, res) => {
                 $project: {
                     _id: 1,
                     owner: 1,
+                    isPublished: 1,
                     title: 1,
                     thumbnail: 1,
                     views: 1,
@@ -314,13 +315,6 @@ const getAllVideos = asyncHandler(async (req, res) => {
 
     let totalContent = 0;
     if (decodedSearch) {
-
-        totalContent += await User.countDocuments({
-            $or: [
-                { username: { $regex: decodedSearch, $options: 'i' } },
-                { fullName: { $regex: decodedSearch, $options: 'i' } }
-            ]
-        })
 
         userSearchResults = await User.aggregate([
             {
@@ -444,7 +438,6 @@ const getAllVideos = asyncHandler(async (req, res) => {
 
         videoSearchResults = await Video.aggregate([
             { $match: { isPublished: true } },
-            { $sample: { size: limitNumber } },
             {
                 $lookup: {
                     from: "users",
@@ -545,7 +538,7 @@ const getAllVideos = asyncHandler(async (req, res) => {
                     views: 1,
                     tags: 1,
                     owner: {
-                        __id: "$ownerDetails._id",
+                        _id: "$ownerDetails._id",
                         username: "$ownerDetails.username",
                         fullName: "$ownerDetails.fullName",
                         avatar: "$ownerDetails.avatar",
@@ -559,7 +552,6 @@ const getAllVideos = asyncHandler(async (req, res) => {
             }
         ]);
 
-        totalContent += parseInt(videos.length)
         channelVideos.push({
             channel: user,
             video: videos[0]
