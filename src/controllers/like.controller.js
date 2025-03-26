@@ -1,4 +1,4 @@
-import mongoose, { isValidObjectId } from "mongoose"
+import { isValidObjectId } from "mongoose"
 import { Like } from "../models/like.model.js"
 import { ApiError } from "../utils/ApiError.js"
 import { ApiResponse } from "../utils/ApiResponse.js"
@@ -6,7 +6,6 @@ import { asyncHandler } from "../utils/asyncHandler.js"
 import { Video } from "../models/video.model.js"
 import { Comment } from "../models/comment.model.js"
 import { Tweet } from "../models/tweet.model.js"
-import { isSubscribed } from "./subscription.controller.js"
 
 const toggleVideoLike = asyncHandler(async (req, res) => {
     const { videoId } = req.params
@@ -92,7 +91,6 @@ const getLikedVideos = asyncHandler(async (req, res) => {
         throw new ApiError(400, 'Page and limit must be positive integers');
     }
 
-    const skip = (parseInt(page) - 1) * parseInt(limit)
     const totalContent = await Like.countDocuments({ likedBy: req.user?._id, video: { $exists: true, $ne: null } })
     const likedVideos = await Like.aggregate([
         {
