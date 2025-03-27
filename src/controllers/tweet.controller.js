@@ -16,8 +16,12 @@ const createTweet = asyncHandler(async (req, res) => {
         imageLocalPath.map((image) => {
             if (!image.mimetype.includes("image")) {
                 imageLocalPath.map((image) => fs.unlinkSync(image.path))
-                throw new ApiError(400, "video file is not supported here")
+                throw new ApiError(400, "Only image files are accepted")
             }
+            if (image.size > 1024 * 1024) { 
+                imageLocalPath.map((image) => fs.unlinkSync(image.path))
+                throw new ApiError(400, `File "${image.originalname}" exceeds 1MB.`);
+              }
         })
     }
 
@@ -45,7 +49,7 @@ const createTweet = asyncHandler(async (req, res) => {
 
     return res
         .status(200)
-        .json(new ApiResponse(200, tweet, "Tweet created successfully"))
+        .json(new ApiResponse(200, tweet, "Tweet posted successfully"))
 })
 
 const getUserTweets = asyncHandler(async (req, res) => {
