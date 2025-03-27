@@ -6,6 +6,7 @@ import { ApiError } from "../utils/ApiError.js";
 import cloudinary from "../utils/cloudinary.js";
 import { ApiResponse } from "../utils/ApiResponse.js";
 import fs from "fs"
+import { Like } from "../models/like.model.js";
 
 const createTweet = asyncHandler(async (req, res) => {
     const { textContent } = req.body
@@ -202,11 +203,12 @@ const deleteTweet = asyncHandler(async (req, res) => {
             }
         }
         await Tweet.findByIdAndDelete(tweet._id)
+        await Like.deleteMany({tweet: tweet._id})
         return res
             .status(200)
             .json(new ApiResponse(200, {}, "Tweet deleted Successfully"))
     }
-    if (!tweet) throw new ApiError(400, "tweetId or owner doesn't exists")
+    if (!tweet) throw new ApiError(400, "tweet doesn't exists")
 })
 
 
