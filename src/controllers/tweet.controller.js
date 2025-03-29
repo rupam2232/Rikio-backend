@@ -128,22 +128,21 @@ const getUserTweets = asyncHandler(async (req, res) => {
 
 const updateTweet = asyncHandler(async (req, res) => {
     const { tweetId } = req.params
-    const { textContent } = req.body
-    const { allImage } = req.body
+    const { textContent, allImage } = req.body
     let imageLocalPath = req.files
 
     if (imageLocalPath) {
         imageLocalPath.map((image) => {
             if (!image.mimetype.includes("image")) {
                 imageLocalPath.map((image) => fs.unlinkSync(image.path))
-                throw new ApiError(400, "video file is not supported here")
+                throw new ApiError(400, "Only image files are accepted")
             }
         })
     }
 
     const tweet = await Tweet.findById(tweetId)
     if (!tweet) throw new ApiError(400, "tweet not found !");
-    // console.log(tweet.owner.toString(), req.user)
+
     if (tweet.owner.toString() !== req.user?.id) throw new ApiError(400, "You are not authorized to perform this action")
 
     let currentImage = []
