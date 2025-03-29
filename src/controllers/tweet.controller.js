@@ -19,10 +19,10 @@ const createTweet = asyncHandler(async (req, res) => {
                 imageLocalPath.map((image) => fs.unlinkSync(image.path))
                 throw new ApiError(400, "Only image files are accepted")
             }
-            if (image.size > 1024 * 1024) { 
+            if (image.size > 1024 * 1024) {
                 imageLocalPath.map((image) => fs.unlinkSync(image.path))
                 throw new ApiError(400, `File "${image.originalname}" exceeds 1MB.`);
-              }
+            }
         })
     }
 
@@ -128,8 +128,23 @@ const getUserTweets = asyncHandler(async (req, res) => {
 
 const updateTweet = asyncHandler(async (req, res) => {
     const { tweetId } = req.params
-    const { textContent, allImage } = req.body
+    const { textContent, allImage = [] } = req.body
     let imageLocalPath = req.files
+
+
+    if (!textContent && !allImage) {
+        if (imageLocalPath) {
+            imageLocalPath.map((image) => fs.unlinkSync(image.path))
+        }
+        throw new ApiError(400, "please give some valid input")
+    }
+
+    if(allImage?.length > 4){
+        if (imageLocalPath) {
+            imageLocalPath.map((image) => fs.unlinkSync(image.path))
+        }
+        throw new ApiError(400, "Only 4 image file are allowed to upload")
+    }
 
     if (imageLocalPath) {
         imageLocalPath.map((image) => {
@@ -138,6 +153,10 @@ const updateTweet = asyncHandler(async (req, res) => {
                 throw new ApiError(400, "Only image files are accepted")
             }
         })
+        if ((allImage?.length + imageLocalPath.length) > 4) {
+            imageLocalPath.map((image) => fs.unlinkSync(image.path))
+            throw new ApiError(400, "Only 4 image file are allowed to upload")
+        }
     }
 
     const tweet = await Tweet.findById(tweetId)
@@ -145,39 +164,36 @@ const updateTweet = asyncHandler(async (req, res) => {
 
     if (tweet.owner.toString() !== req.user?.id) throw new ApiError(400, "You are not authorized to perform this action")
 
-    let currentImage = []
     if (imageLocalPath) {
         for (let i = 0; i < imageLocalPath.length; i++) {
             let image = imageLocalPath[i].path
             const uploadedImage = await cloudinary.upload(image, 'videotube/tweets')
             allImage.push(uploadedImage.secure_url)
-            currentImage.push(uploadedImage.secure_url)
         }
     }
-    let deleteImage
-    if (allImage) {
-        if (allImage.length > 4) {
-            for (let i = 0; i < currentImage.length; i++) {
-                await cloudinary.deleteImage(currentImage[i])
-            }
-            throw new ApiError(400, "Only 4 files are allowed to upload");
-        }
+    // let deleteImage
+    // if (allImage) {
+    //     if (allImage.length > 4) {
+    //         for (let i = 0; i < currentImage.length; i++) {
+    //             await cloudinary.deleteImage(currentImage[i])
+    //         }
+    //         throw new ApiError(400, "Only 4 files are allowed to upload");
+    //     }
 
-        deleteImage = tweet.content.image.filter((img) => !allImage.includes(img))
-    } else {
-        if (tweet.content.image) deleteImage = tweet.content.image;
-    }
+    //     deleteImage = tweet.content.image.filter((img) => !allImage.includes(img))
+    // } else {
+    //     if (tweet.content.image) deleteImage = tweet.content.image;
+    // }
 
-    if (deleteImage) {
-        if (deleteImage.length > 0) {
-            for (let i = 0; i < deleteImage.length; i++) {
-                const image = deleteImage[i]
-                await cloudinary.deleteImage(image)
-            }
-        }
-    }
+    // if (deleteImage) {
+    //     if (deleteImage.length > 0) {
+    //         for (let i = 0; i < deleteImage.length; i++) {
+    //             const image = deleteImage[i]
+    //             await cloudinary.deleteImage(image)
+    //         }
+    //     }
+    // }
 
-    if (!(textContent || allImage)) throw new ApiError(400, "please give some valid input")
 
     tweet.content.textContent = textContent ? textContent : null;
     tweet.content.image = allImage ? allImage : [];
@@ -202,7 +218,7 @@ const deleteTweet = asyncHandler(async (req, res) => {
             }
         }
         await Tweet.findByIdAndDelete(tweet._id)
-        await Like.deleteMany({tweet: tweet._id})
+        await Like.deleteMany({ tweet: tweet._id })
         return res
             .status(200)
             .json(new ApiResponse(200, {}, "Tweet deleted Successfully"))

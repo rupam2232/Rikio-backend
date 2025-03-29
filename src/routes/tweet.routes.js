@@ -8,6 +8,6 @@ const router = Router()
 
 router.route("/").post(verifyJWT, upload.array("images",4), createTweet)
 router.route("/:userId").get(optionalVerifyJWT, getUserTweets)
-router.route("/:tweetId").delete(verifyJWT, deleteTweet).patch(verifyJWT,upload.array("image",4), updateTweet)
+router.route("/:tweetId").delete(verifyJWT, deleteTweet).patch(verifyJWT,upload.array("images",4), updateTweet)
 
 export default router
