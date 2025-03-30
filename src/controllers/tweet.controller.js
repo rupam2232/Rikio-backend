@@ -54,16 +54,32 @@ const createTweet = asyncHandler(async (req, res) => {
 })
 
 const getUserTweets = asyncHandler(async (req, res) => {
-    const { userId } = req.params
+    const { userId } = req.params;
+    const { page = 1, limit = 10, sortBy = 'createdAt', sortType = 'desc' } = req.query;
+
+    const pageNumber = parseInt(page);
+    const limitNumber = parseInt(limit);
+
+    if (pageNumber < 1 || limitNumber < 1) {
+        throw new ApiError(400, 'Page and limit must be positive integers');
+    }
 
     const user = await User.findById(userId)
     if (!user) throw new ApiError(400, "user not found")
+
+    const totalTweets = await Tweet.countDocuments({ owner: new mongoose.Types.ObjectId(userId) })
 
     const tweets = await Tweet.aggregate([
         {
             $match: {
                 owner: new mongoose.Types.ObjectId(userId)
             }
+        }, {
+            $sort: { [sortBy]: sortType === 'asc' ? 1 : -1 }
+        }, {
+            $skip: (pageNumber - 1) * limitNumber
+        }, {
+            $limit: limitNumber
         }, {
             $lookup: {
                 from: "users",
@@ -107,8 +123,6 @@ const getUserTweets = asyncHandler(async (req, res) => {
                 },
             }
         }, {
-            $sort: { createdAt: -1 }
-        }, {
             $project: {
                 _id: 1,
                 content: 1,
@@ -123,14 +137,29 @@ const getUserTweets = asyncHandler(async (req, res) => {
 
     return res
         .status(200)
-        .json(new ApiResponse(200, tweets, "tweets fetched successfully"))
+        .json(new ApiResponse(200, {
+            tweets,
+            totalTweets,
+            currentPage: pageNumber,
+            totalPages: Math.ceil(totalTweets / limitNumber)
+        }, "tweets fetched successfully"))
 })
 
 const updateTweet = asyncHandler(async (req, res) => {
     const { tweetId } = req.params
-    const { textContent, allImage = [] } = req.body
+    const { textContent } = req.body
+    let { allImage } = req.body
     let imageLocalPath = req.files
 
+    if (allImage) {
+        if (typeof allImage === 'string') {
+            allImage = [allImage];
+        } else if (!Array.isArray(allImage)) {
+            allImage = [];
+        }
+    } else {
+        allImage = [];
+    }
 
     if (!textContent && !allImage) {
         if (imageLocalPath) {
@@ -139,7 +168,7 @@ const updateTweet = asyncHandler(async (req, res) => {
         throw new ApiError(400, "please give some valid input")
     }
 
-    if(allImage?.length > 4){
+    if (allImage?.length > 4) {
         if (imageLocalPath) {
             imageLocalPath.map((image) => fs.unlinkSync(image.path))
         }
@@ -164,6 +193,7 @@ const updateTweet = asyncHandler(async (req, res) => {
 
     if (tweet.owner.toString() !== req.user?.id) throw new ApiError(400, "You are not authorized to perform this action")
 
+
     if (imageLocalPath) {
         for (let i = 0; i < imageLocalPath.length; i++) {
             let image = imageLocalPath[i].path
@@ -171,29 +201,14 @@ const updateTweet = asyncHandler(async (req, res) => {
             allImage.push(uploadedImage.secure_url)
         }
     }
-    // let deleteImage
-    // if (allImage) {
-    //     if (allImage.length > 4) {
-    //         for (let i = 0; i < currentImage.length; i++) {
-    //             await cloudinary.deleteImage(currentImage[i])
-    //         }
-    //         throw new ApiError(400, "Only 4 files are allowed to upload");
-    //     }
 
-    //     deleteImage = tweet.content.image.filter((img) => !allImage.includes(img))
-    // } else {
-    //     if (tweet.content.image) deleteImage = tweet.content.image;
-    // }
+    if (tweet.content.image.length > 0) {
+        const imagesToDlt = tweet.content.image.filter((img) => !allImage.includes(img))
 
-    // if (deleteImage) {
-    //     if (deleteImage.length > 0) {
-    //         for (let i = 0; i < deleteImage.length; i++) {
-    //             const image = deleteImage[i]
-    //             await cloudinary.deleteImage(image)
-    //         }
-    //     }
-    // }
-
+        for (const image of imagesToDlt) {
+            await cloudinary.deleteImage(image)
+        }
+    }
 
     tweet.content.textContent = textContent ? textContent : null;
     tweet.content.image = allImage ? allImage : [];
