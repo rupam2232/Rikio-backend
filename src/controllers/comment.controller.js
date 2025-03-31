@@ -214,6 +214,8 @@ const getTweetComments = asyncHandler(async (req, res) => {
                             avatar: 1,
                             username: 1,
                             verified: 1,
+                            bio: 1,
+                            createdAt: 1
                         }
                     }
                 ],
@@ -225,6 +227,13 @@ const getTweetComments = asyncHandler(async (req, res) => {
                 localField: '_id',
                 foreignField: 'comment',
                 as: 'likes',
+            }
+        }, {
+            $lookup: {
+                from: "subscriptions",
+                localField: "ownerInfo._id",
+                foreignField: "channel",
+                as: "subscribers"
             }
         }, {
             $lookup: {
@@ -274,6 +283,13 @@ const getTweetComments = asyncHandler(async (req, res) => {
                         then: true,
                         else: false
                     }
+                },
+                isSubscribed: {
+                    $cond: {
+                        if: { $in: [req.user?._id, "$subscribers.subscriber"] },
+                        then: true,
+                        else: false
+                    }
                 }
             }
         }, {
@@ -288,6 +304,8 @@ const getTweetComments = asyncHandler(async (req, res) => {
                 isLiked: 1,
                 isTweetOwner: 1,
                 isCommentOwner: 1,
+                isSubscribed: 1,
+                subscribers: { $size: "$subscribers" },
                 createdAt: 1
             }
         }, {

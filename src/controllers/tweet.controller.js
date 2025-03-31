@@ -7,6 +7,7 @@ import cloudinary from "../utils/cloudinary.js";
 import { ApiResponse } from "../utils/ApiResponse.js";
 import fs from "fs"
 import { Like } from "../models/like.model.js";
+import { Comment } from "../models/comment.model.js";
 
 const createTweet = asyncHandler(async (req, res) => {
     const { textContent } = req.body
@@ -82,15 +83,6 @@ const getUserTweets = asyncHandler(async (req, res) => {
             $limit: limitNumber
         }, {
             $lookup: {
-                from: "users",
-                localField: "owner",
-                foreignField: "_id",
-                as: "ownerDetails",
-            }
-        }, {
-            $unwind: "$ownerDetails"
-        }, {
-            $lookup: {
                 from: 'likes',
                 localField: '_id',
                 foreignField: 'tweet',
@@ -142,7 +134,103 @@ const getUserTweets = asyncHandler(async (req, res) => {
             totalTweets,
             currentPage: pageNumber,
             totalPages: Math.ceil(totalTweets / limitNumber)
-        }, "tweets fetched successfully"))
+        }, "Tweets fetched successfully"))
+})
+
+const getTweetById = asyncHandler(async (req, res) => {
+    const { tweetId } = req.params;
+
+    if(!mongoose.isValidObjectId(tweetId)) throw new ApiError(400, "Tweet id is not valid")
+
+    const tweet = await Tweet.aggregate([
+        {
+            $match: {
+                _id: new mongoose.Types.ObjectId(tweetId)
+            }
+        }, {
+            $lookup: {
+                from: "users",
+                localField: "owner",
+                foreignField: "_id",
+                as: "ownerDetails",
+            }
+        }, {
+            $unwind: "$ownerDetails"
+        }, {
+            $lookup: {
+                from: "subscriptions",
+                localField: "ownerDetails._id",
+                foreignField: "channel",
+                as: "ownerSubscribers"
+            }
+        }, {
+            $lookup: {
+                from: 'likes',
+                localField: '_id',
+                foreignField: 'tweet',
+                as: 'likes',
+            }
+        }, {
+            $lookup: {
+                from: 'comments',
+                localField: '_id',
+                foreignField: 'tweet',
+                as: 'comments',
+            }
+        }, {
+            $addFields: {
+                totalLikes: { $size: "$likes" },
+                totalComments: { $size: "$comments" },
+                isLiked: {
+                    $cond: {
+                        if: { $in: [req.user?._id, "$likes.likedBy"] },
+                        then: true,
+                        else: false
+                    }
+                },
+                isTweetOwner: {
+                    $cond: {
+                        if: { $eq: ["$owner", req.user?._id] },
+                        then: true,
+                        else: false
+                    }
+                },isSubscribed: {
+                    $cond: {
+                        if: { $in: [req.user?._id, "$ownerSubscribers.subscriber"] },
+                        then: true,
+                        else: false
+                    }
+                }
+            }
+        }, {
+            $project: {
+                _id: 1,
+                content: 1,
+                totalLikes: 1,
+                totalComments: 1,
+                isLiked: 1,
+                isTweetOwner: 1,
+                createdAt: 1,
+                ownerDetails: {
+                    _id: "$ownerDetails._id",
+                    avatar: "$ownerDetails.avatar",
+                    fullName: "$ownerDetails.fullName",
+                    username: "$ownerDetails.username",
+                    verified: "$ownerDetails.verified",
+                    bio: "$ownerDetails.bio",
+                    subscribers: {$size : "$ownerSubscribers"},
+                    isSubscribed: "$isSubscribed",
+                    createdAt: "$ownerDetails.createdAt",
+                }
+            }
+        }
+    ])
+
+    if(tweet.length === 0) throw new ApiError(404, "Tweet not found")
+
+    return res
+        .status(200)
+        .json(new ApiResponse(200, tweet[0], "Tweet fetched successfully"))
 })
 
 const updateTweet = asyncHandler(async (req, res) => {
@@ -234,6 +322,7 @@ const deleteTweet = asyncHandler(async (req, res) => {
         }
         await Tweet.findByIdAndDelete(tweet._id)
         await Like.deleteMany({ tweet: tweet._id })
+        await Comment.deleteMany({ tweet: tweet._id })
         return res
             .status(200)
             .json(new ApiResponse(200, {}, "Tweet deleted Successfully"))
@@ -245,6 +334,7 @@ const deleteTweet = asyncHandler(async (req, res) => {
 export {
     createTweet,
     getUserTweets,
+    getTweetById,
     updateTweet,
     deleteTweet
 }

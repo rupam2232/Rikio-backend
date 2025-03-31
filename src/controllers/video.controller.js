@@ -7,6 +7,7 @@ import { Video } from "../models/video.model.js"
 import fs from "fs"
 import mongoose, { isValidObjectId } from "mongoose"
 import { Like } from "../models/like.model.js"
+import { Comment } from "../models/comment.model.js"
 
 
 const publishVideo = asyncHandler(async (req, res) => {
@@ -76,7 +77,7 @@ const getVideoById = asyncHandler(async (req, res) => {
 
     const isVideoAvl = await Video.findOne({ _id: videoId, isPublished: true })
 
-    if (!isVideoAvl) throw new ApiError(400, "Video not found")
+    if (!isVideoAvl) throw new ApiError(404, "Video not found")
 
     const video = await Video.aggregate([
         {
@@ -199,6 +200,7 @@ const deleteVideo = asyncHandler(async (req, res) => {
     await cloudinary.deleteImage(video.thumbnail)
     await Video.deleteOne({ _id: videoId, owner: user })
     await Like.deleteMany({ video: video._id })
+    await Comment.deleteMany({ video: video._id })
     return res
         .status(200)
         .json(new ApiResponse(200, true, `${videoId} video deleted successfully`))
