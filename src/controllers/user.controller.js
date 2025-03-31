@@ -571,6 +571,7 @@ const getWatchHistory = asyncHandler(async (req, res) => {
 
 const pushVideoToWatchHistory = asyncHandler(async (req, res) => {
     const { videoId, userTimeZoneOffset } = req.body
+    
     if (!isValidObjectId(videoId)) throw new ApiError(400, "video id is not a valid object id")
 
     if (!userTimeZoneOffset) throw new ApiError(400, "userTimeZoneOffset required")
@@ -582,28 +583,23 @@ const pushVideoToWatchHistory = asyncHandler(async (req, res) => {
 
     const nowUTC = new Date();
 
-    // Convert UTC time to user's local date using offset (in minutes)
     const userNow = new Date(nowUTC.getTime() + userTimeZoneOffset * 60000);
 
-    // Get user's local day boundaries
     const userStartOfDay = new Date(userNow);
-    userStartOfDay.setUTCHours(0, 0, 0, 0); // Start of the user's local day in UTC context
+    userStartOfDay.setUTCHours(0, 0, 0, 0);
 
     const userEndOfDay = new Date(userStartOfDay);
-    userEndOfDay.setUTCDate(userEndOfDay.getUTCDate() + 1); // Next day start (exclusive)
+    userEndOfDay.setUTCDate(userEndOfDay.getUTCDate() + 1);
 
-    // Convert back to absolute UTC time for database query
     const utcStartOfDay = new Date(userStartOfDay.getTime() - userTimeZoneOffset * 60000);
     const utcEndOfDay = new Date(userEndOfDay.getTime() - userTimeZoneOffset * 60000);
 
-    // Delete documents matching uniqueId and within the same local day
     await watchHistory.deleteMany({
         videoId,
         watchedBy: req.user._id,
         createdAt: { $gte: utcStartOfDay, $lt: utcEndOfDay }
     });
 
-    // Insert a new document with the current UTC timestamp
     const addedVideo = await watchHistory.create({
         videoId,
         watchedBy: req.user._id,

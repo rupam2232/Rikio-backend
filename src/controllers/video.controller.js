@@ -71,7 +71,7 @@ const publishVideo = asyncHandler(async (req, res) => {
 
 const getVideoById = asyncHandler(async (req, res) => {
     const { videoId } = req.params
-    if (!videoId) throw new ApiError(400, "not get videoId")
+    if (!videoId) throw new ApiError(400, "videoId is required")
 
     if (!isValidObjectId(videoId)) throw new ApiError(400, "Video id is not valid")
 
@@ -84,6 +84,79 @@ const getVideoById = asyncHandler(async (req, res) => {
             $match: {
                 _id: new mongoose.Types.ObjectId(videoId),
                 isPublished: true
+            }
+        }, {
+            $lookup: {
+                from: "users",
+                localField: "owner",
+                foreignField: "_id",
+                as: "owner",
+                pipeline: [
+                    {
+                        $project: {
+                            _id: 1,
+                            fullName: 1,
+                            username: 1,
+                            avatar: 1,
+                            verified: 1,
+                            bio: 1,
+                            createdAt: 1
+                        }
+                    }
+                ]
+            }
+        }, {
+            $addFields: {
+                owner: { "$first": "$owner" }
+            }
+        },
+    ])
+
+    const likes = await Like.aggregate([
+        {
+            $match: {
+                video: new mongoose.Types.ObjectId(videoId)
+            }
+        }, {
+            $addFields: {
+                isLikedBy: {
+                    $cond: {
+                        if: { $eq: ["$likedBy", new mongoose.Types.ObjectId(req.user?._id)] },
+                        then: true,
+                        else: false
+                    }
+                }
+            }
+        }, {
+            $group: {
+                _id: "$video",
+                totalLikes: { $sum: 1 },
+                isLiked: { $max: "$isLikedBy" }
+            }
+        }
+
+    ])
+
+    return res
+        .status(200)
+        .json(new ApiResponse(200, { video: video[0], likes: likes[0] ? likes[0] : { totalLikes: 0, isLiked: false } }, `data of ${videoId}`))
+
+})
+
+const getPrvVideoById = asyncHandler(async (req, res) => {
+    const { videoId } = req.params
+    if (!videoId) throw new ApiError(400, "videoId is required")
+
+    if (!isValidObjectId(videoId)) throw new ApiError(400, "Video id is not valid")
+
+    const isVideoAvl = await Video.findOne({ _id: videoId, owner: req.user._id })
+
+    if (!isVideoAvl) throw new ApiError(404, "Video not found")
+
+    const video = await Video.aggregate([
+        {
+            $match: {
+                _id: new mongoose.Types.ObjectId(videoId),
             }
         }, {
             $lookup: {
@@ -594,6 +667,7 @@ const getAllVideos = asyncHandler(async (req, res) => {
 export {
     publishVideo,
     getVideoById,
+    getPrvVideoById,
     updateVideo,
     deleteVideo,
     togglePublishStatus,
