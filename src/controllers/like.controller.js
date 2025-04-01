@@ -91,7 +91,31 @@ const getLikedVideos = asyncHandler(async (req, res) => {
         throw new ApiError(400, 'Page and limit must be positive integers');
     }
 
-    const totalContent = await Like.countDocuments({ likedBy: req.user?._id, video: { $exists: true, $ne: null } })
+    const totalContent = await Like.aggregate([
+        {
+          $match: {
+            likedBy: req.user?._id,
+            video: { $exists: true, $ne: null },
+          },
+        },
+        {
+          $lookup: {
+            from: 'videos', // Assuming your video collection is named "videos"
+            localField: 'video',
+            foreignField: '_id',
+            as: 'videoInfo',
+          },
+        },
+        {
+          $match: {
+            'videoInfo.isPublished': true,
+          },
+        },
+        {
+          $count: 'count',
+        },
+      ]);
+
     const likedVideos = await Like.aggregate([
         {
             $match: {
@@ -105,6 +129,8 @@ const getLikedVideos = asyncHandler(async (req, res) => {
                 foreignField: '_id',
                 pipeline: [
                     {
+                        $match: {isPublished: true}
+                    }, {
                         $lookup: {
                             from: 'users',
                             localField: 'owner',
@@ -170,9 +196,6 @@ const getLikedVideos = asyncHandler(async (req, res) => {
         }, {
             $unwind: "$video"
         },
-        // $sort: {
-        //     "createdAt": -1
-        // },
         { $sort: { [sortBy]: sortType === 'asc' ? 1 : -1 } },
         { $skip: (pageNumber - 1) * limitNumber },
         { $limit: limitNumber }
@@ -196,7 +219,8 @@ const getLikedVideos = asyncHandler(async (req, res) => {
                 {
                     likedVideos: [],
                     currentPage: pageNumber,
-                    totalPages: 0
+                    totalPages: 0,
+                    totalVideos: 0
                 }, "liked videos"))
     }
     return res
@@ -204,7 +228,8 @@ const getLikedVideos = asyncHandler(async (req, res) => {
         .json(new ApiResponse(200, {
             likedVideos: likedVideos[0].videos,
             currentPage: pageNumber,
-            totalPages: Math.ceil((totalContent) / limitNumber)
+            totalPages: Math.ceil((totalContent[0].count) / limitNumber),
+            totalVideos: totalContent[0].count
         }, "liked videos"))
 })
 
