@@ -37,6 +37,10 @@ import healthcheckRouter from "./routes/healthcheck.routes.js"
 import dashboardRouter from "./routes/dashboard.routes.js"
 import otpRouter from "./routes/otp.routes.js"
 
+app.get("/test-error", (req, res, next) => {
+  res.status(400).json({ success: false, message: "Bad Request Test" });
+});
+
 app.use("/api/v1/users", userRouter)
 app.use("/api/v1/videos", videoRouter)
 app.use("/api/v1/tweet", tweetRouter)
