@@ -36,9 +36,14 @@ import commentRouter from "./routes/comment.routes.js"
 import healthcheckRouter from "./routes/healthcheck.routes.js"
 import dashboardRouter from "./routes/dashboard.routes.js"
 import otpRouter from "./routes/otp.routes.js"
+import { ApiError } from "./utils/ApiError.js";
 
 app.get("/test-error", (req, res, next) => {
-  res.status(400).json({ success: false, message: "Bad Request Test" });
+    try {
+      throw new ApiError(400,"This is a forced error!");
+    } catch (err) {
+      next(err); // ✅ Pass it to the error handler
+    }
 });
 
 app.use("/api/v1/users", userRouter)
