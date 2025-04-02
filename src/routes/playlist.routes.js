@@ -14,8 +14,6 @@ import { optionalVerifyJWT } from "../middlewares/optionalAuth.middleware.js"
 
 const router = Router();
 
-// router.use(verifyJWT); // Apply verifyJWT middleware to all routes in this file
-
 router.route("/").post(verifyJWT, createPlaylist)
 
 router.route("/user").get(verifyJWT, getUserPlaylists);

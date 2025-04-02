@@ -4,7 +4,6 @@ import {optionalVerifyJWT} from "../middlewares/optionalAuth.middleware.js"
 import { toggleSubscription, getUserChannelSubscribers, getSubscribedChannels, isSubscribed } from "../controllers/subscription.controller.js";
 
 const router = Router()
-// router.use(verifyJWT)
 
 router.route("/").get(verifyJWT, getSubscribedChannels)
 router.route("/c/:channelId").post(verifyJWT, toggleSubscription)

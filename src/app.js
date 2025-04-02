@@ -48,7 +48,6 @@ app.use("/api/v1/healthcheck", healthcheckRouter)
 app.use("/api/v1/dashboard", dashboardRouter)
 app.use("/api/v1/otp", otpRouter)
 
-// https://devuiv2.vercel.app/templates/youtube
 
 
 export {app}
