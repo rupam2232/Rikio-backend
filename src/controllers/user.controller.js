@@ -89,11 +89,11 @@ const loginUser = asyncHandler(async (req, res) => {
         $or: [{ username }, { email }]
     })
 
-    if (!user) throw new ApiError(404, "Invalid user credentials")
+    if (!user) throw new ApiError(400, "Invalid user credentials")
 
     const isPasswordValid = await user.isPasswordCorrect(password)
 
-    if (!isPasswordValid) throw new ApiError(404, "Invalid user credentials")
+    if (!isPasswordValid) throw new ApiError(400, "Invalid user credentials")
 
     const { accessToken, refreshToken } = await generateAccessAndRefreshTokens(user._id);
 
