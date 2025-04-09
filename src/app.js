@@ -37,18 +37,6 @@ import healthcheckRouter from "./routes/healthcheck.routes.js"
 import dashboardRouter from "./routes/dashboard.routes.js"
 import otpRouter from "./routes/otp.routes.js"
 
-app.get("/test-error", (req, res, next) => {
-  res.status(400).json({ success: false, message: "Bad Request Test" });
-});
-
-app.get("/force-error", (req, res, next) => {
-    try {
-      throw new Error("This is a forced error!");
-    } catch (err) {
-      next(err); // ✅ Pass it to the error handler
-    }
-});
-
 app.use("/api/v1/users", userRouter)
 app.use("/api/v1/videos", videoRouter)
 app.use("/api/v1/tweet", tweetRouter)
@@ -61,7 +49,7 @@ app.use("/api/v1/dashboard", dashboardRouter)
 app.use("/api/v1/otp", otpRouter)
 
 app.use((err, req, res, next) => {
-  console.error("Error:", err);
+  console.error(err);
 
   res.status(err.statusCode || 500).json({
     success: false,
