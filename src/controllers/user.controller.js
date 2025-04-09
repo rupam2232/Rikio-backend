@@ -85,7 +85,7 @@ const loginUser = asyncHandler(async (req, res) => {
 
 
     if (!(username || email)){
-        return res.status(400).json(new ApiResponse(400, {}, "username or email is required"))
+        return res.status(400).json(new ApiError(400, "username or email is required"))
     }
 
     // if (!(username || email)) throw new ApiError(200, "username or email is required")
