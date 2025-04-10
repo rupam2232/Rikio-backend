@@ -511,9 +511,18 @@ const getAllVideos = asyncHandler(async (req, res) => {
         ]);
     } else {
 
+        totalContent += await Video.countDocuments({isPublished: true})
+
         videoSearchResults = await Video.aggregate([
-            { $match: { isPublished: true } },
             {
+                $match: { isPublished: true }
+            }, {
+                $sort: { [sortBy]: sortType === 'asc' ? 1 : -1 }
+            }, {
+                $skip: (pageNumber - 1) * limitNumber
+            }, {
+                $limit: limitNumber
+            }, {
                 $lookup: {
                     from: "users",
                     localField: "owner",
@@ -550,7 +559,6 @@ const getAllVideos = asyncHandler(async (req, res) => {
                     createdAt: 1,
                     views: 1,
                     isSubscribed: 1,
-                    tags: 1,
                     owner: {
                         _id: "$ownerDetails._id",
                         username: "$ownerDetails.username",
@@ -565,7 +573,6 @@ const getAllVideos = asyncHandler(async (req, res) => {
             }
         ]);
 
-        totalContent += parseInt(videoSearchResults.length)
     }
 
     // Fetch videos uploaded by found channels
