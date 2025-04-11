@@ -584,19 +584,18 @@ const pushVideoToWatchHistory = asyncHandler(async (req, res) => {
 
     if (!isVideoAvl) throw new ApiError(400, "video not found")
 
-
     const nowUTC = new Date();
 
-    const userNow = new Date(nowUTC.getTime() + userTimeZoneOffset * 60000);
+    const userNow = new Date(nowUTC.getTime() - userTimeZoneOffset * 60000);
 
     const userStartOfDay = new Date(userNow);
-    userStartOfDay.setUTCHours(0, 0, 0, 0);
+    userStartOfDay.setHours(0, 0, 0, 0);
 
     const userEndOfDay = new Date(userStartOfDay);
-    userEndOfDay.setUTCDate(userEndOfDay.getUTCDate() + 1);
+    userEndOfDay.setDate(userEndOfDay.getDate() + 1);
 
-    const utcStartOfDay = new Date(userStartOfDay.getTime() - userTimeZoneOffset * 60000);
-    const utcEndOfDay = new Date(userEndOfDay.getTime() - userTimeZoneOffset * 60000);
+    const utcStartOfDay = new Date(userStartOfDay.getTime() + userTimeZoneOffset * 60000);
+    const utcEndOfDay = new Date(userEndOfDay.getTime() + userTimeZoneOffset * 60000);
 
     await watchHistory.deleteMany({
         videoId,

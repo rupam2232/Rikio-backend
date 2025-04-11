@@ -8,6 +8,7 @@ import fs from "fs"
 import mongoose, { isValidObjectId } from "mongoose"
 import { Like } from "../models/like.model.js"
 import { Comment } from "../models/comment.model.js"
+import { watchHistory } from "../models/watchHistory.model.js"
 
 
 const publishVideo = asyncHandler(async (req, res) => {
@@ -274,6 +275,7 @@ const deleteVideo = asyncHandler(async (req, res) => {
     await Video.deleteOne({ _id: videoId, owner: user })
     await Like.deleteMany({ video: video._id })
     await Comment.deleteMany({ video: video._id })
+    await watchHistory.deleteMany({ videoId: video._id })
     return res
         .status(200)
         .json(new ApiResponse(200, true, `${videoId} video deleted successfully`))
